@@ -1,0 +1,17 @@
+Package: mhca
+Type: Package
+Title: Mahalanobis HCA
+Version: 0.1
+Date: 2019-01-24
+Author: Tomas Sieger, Karel Fiser
+Depends: 
+Imports: stats
+Suggests: testthat
+URL: http://github.com/tsieger/mhca
+Maintainer: Tomas Sieger <tomas.sieger@seznam.cz>
+BugReports: https://github.com/tsieger/mhca/issues
+Description: Mahalanobis distance-based hierarchical cluster analysis, 
+    in which elliptical clusters get found naturally.
+License: GPL-2
+LazyLoad: yes
+LazyData: true

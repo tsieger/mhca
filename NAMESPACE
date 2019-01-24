@@ -1,0 +1,5 @@
+useDynLib(mhca,mhclust_)
+
+import(stats)
+
+export(mhclust)
