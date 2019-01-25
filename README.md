@@ -3,9 +3,11 @@
 Mahalanobis distance-based hierarchical cluster analysis, in which
 elliptical clusters get found naturally. 
 
+
 ## Install:
 
     devtools::install_github("tsieger/mhca")
+
 
 ## Example (Comparison with Classical HCA):
 
@@ -44,9 +46,10 @@ elliptical clusters get found naturally.
 
 Find out more at https://github.com/tsieger/mhca.
 
+
 ## Reference
 
-A paper ["Detection and monitoring of normal and leukemic cell 
+Please cite the paper ["Detection and monitoring of normal and leukemic cell 
 populations with hierarchical clustering of flow cytometry 
 data"](http://dx.doi.org/10.1002/cyto.a.21148) in 
 [Cytometry Part A](https://onlinelibrary.wiley.com/journal/15524930).
