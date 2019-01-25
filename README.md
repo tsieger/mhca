@@ -46,6 +46,12 @@ elliptical clusters get found naturally.
 
 Find out more at https://github.com/tsieger/mhca.
 
+You can use https://github.com/tsieger/idendro or 
+https://github.com/tsieger/idendr0 to interactively 
+explore HCA dendrograms:
+
+![Example](/inst/idendro.png?raw=true "Interactive dendrogram exploration with idendro.")
+
 
 ## Reference
 
