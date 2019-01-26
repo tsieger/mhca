@@ -232,10 +232,11 @@ void printNumMatrix(const char *name,Num *x,Num rows,Num cols) {
  *   r - number of rows of `x'
  *   c - number of columns of `x'
  *   res - where to hold the resulting `c x c' matrix
+ *   covMeansTmp - temporary storage for means of x
  */
-double *cov(double *x, Num r, Num c, double *res) {
+double *cov(double *x, Num r, Num c, double *res,double *covMeansTmp) {
     Num i,i1,i2,j;
-    double *means=(double *)MEM_ALLOC(c,sizeof(double));
+    double *means=covMeansTmp;
     for (i=0;i<c;i++) {
         double sum=0.0;
         for (j=0;j<r;j++) {
@@ -258,7 +259,6 @@ double *cov(double *x, Num r, Num c, double *res) {
             }
         }
     }
-    MEM_FREE(means);
     return res;
 }
 
@@ -496,6 +496,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     Num covXijLength;
     double *invcov,*invcovMerged,*fakeInvCov; // inverse covariance matrices
     double *ic1,*ic2; // inverse covariance matrices
+    double *covMeansTmp; // temporary storage for means of x during computation of cov
 
     double *distX,*distXTmp; // distance matrix of x
     double maxDistX; // max value of distX
@@ -569,6 +570,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     if (distXLen!=n*(n-1)/2) error("invalid distXLen");
     p=dimX[1]; // number of dimensions of the feature space
     DBG(2,"p=%d\n",p);
+    covMeansTmp=(double *)MEM_ALLOC(p,sizeof(double));
     DBG_CODE(3,printDoubleMatrix("x",x,n,p));
     covXijLength=p*p;
 
@@ -830,7 +832,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG(2,"wf1: %g\n",wf1);
         // try to fit an ellipsoid to the merged cluster - try to
         // compute the inverse of covariance matrix
-        cov(xij,xijN,p,covXij);
+        cov(xij,xijN,p,covXij,covMeansTmp);
         DBG_CODE(2,printDoubleMatrix("covXij",covXij,p,p));
         // if the cluster consists of few members only, do not take its shape too serious:
         // round it somehow (make closer to circle) by weighting
@@ -1310,6 +1312,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 	DBG(2,"mhclust_ cleaning\n");
 
     MEM_FREE(distXTmp);
+    MEM_FREE(covMeansTmp);
     MEM_FREE(clusterSize);
     MEM_FREE(clusterId);
     MEM_FREE(xij);
