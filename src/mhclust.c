@@ -679,7 +679,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         Num source,target,count;
         Num distXIndicesLen;
 
-        DBG_CODE(3, {
+        DBG_CODE(3,{
             DBGU("\n====================== step %d ============================\n",s);
             for (i=0;i<clusterCount;i++) {
                 DBGU("members[%d]: %s\n",C2R(i),printMembers(members[i]));
@@ -794,7 +794,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 xij[j+offset1]=x[c1indices[j]+offset2];
             }
         }
-        DBG_CODE(3) printNumMatrix("c2indices",c2indices,1,c2n);
+        DBG_CODE(3,printNumMatrix("c2indices",c2indices,1,c2n));
         for (i=0;i<p;i++) {
             int offset1=xijN*i;
             int offset2=n*i;
@@ -802,7 +802,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 xij[c1n+j+offset1]=x[c2indices[j]+offset2];
             }
         }
-        DBG_CODE(2) printDoubleMatrix("xij",xij,xijN,p);
+        DBG_CODE(2,printDoubleMatrix("xij",xij,xijN,p));
 
         // compute the weight factor controlling the Mahalanobis-Euclidean
         // balance (to be applied when measuring distances relatively to
@@ -1216,12 +1216,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             i=ii+1;
         }
         distXLen-=clusterCount-1;
-        DBG_CODE(3) {
+        DBG_CODE(3,{
             DBGU("clusterCount %d\n",clusterCount);
             DBGU("distXLen %d\n",distXLen);
             for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
             printDoubleMatrix("distX",distXTmp,1,(clusterCount-1)*(clusterCount-2)/2);
-        }
+        });
         DBG_CODE(3,printDistMatrix("distX",distX,clusterCount-1,maxDistX));
 
         // update clusterCount, clusterSize, clusterId
