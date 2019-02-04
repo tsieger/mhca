@@ -438,7 +438,7 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
     Num i,j,yn;
     yn=constructRepresentantsOfCluster(x,n,p,centroid,members,
                                        clusterFrom,y,quickMode,dbg);
-    DBG_CODE(4,printDoubleMatrix("y",y,yn,p);
+    DBG_CODE(4,printDoubleMatrix("y",y,yn,p));
     DBG_CODE(4,printDoubleMatrixRow("centroid[clusterTo]",centroid,clusterCount,p,clusterTo));
     //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
     for (i=0;i<p;i++) {
@@ -582,7 +582,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     k=F77_CALL(idamax)(&distXLen,distX,&lda);
     ASSERT(k>0,"invalid idamax retcode");
     maxDistX=distX[k-1];
-    DBG(4,"found maximum %g at %d\n",maxDistX,k-1));
+    DBG(4,"found maximum %g at %d\n",maxDistX,k-1);
     DBG_CODE(4,printDoubleMatrix("distX (orig)",distX,1,distXLen));
     for (i=0;i<distXLen;i++) distX[i]=maxDistX-distX[i];
     DBG_CODE(4,printDoubleMatrix("distX (tx'd)",distX,1,distXLen));
