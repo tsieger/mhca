@@ -50,10 +50,6 @@
 #define MEM_ALLOC(n,size) R_alloc(n,size)
 #define MEM_FREE(p)
 
-// TODO:optimize if necessary
-#define MEM_ALLOC_FAST MEM_ALLOC
-#define MEM_FREE_FAST MEM_FREE
-
 typedef int Num;
 
 typedef struct _NumList {
@@ -257,11 +253,11 @@ double *cov(double *x, Num r, Num c, double *res,double *covMeansTmp) {
  *   n - number of rows of `X'
  *   p - number of columns of `X'
  *   IC - inverse of the covariance matrix
+ *   buf - buffer of working matrix of size `n x p'
  *   dbg
  */
-double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,int dbg) {
+double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,int dbg) {
     Num i,j;
-    double *result=(double*)MEM_ALLOC_FAST(n*p,sizeof(double));
     double r;
 
     /*
@@ -285,8 +281,8 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,int dbg) {
                     IC,&p, // IC, ld = p
                     X,&n, // X, ld = n
                     &beta,
-                    result,&n); // R, ld = n
-    DBG_CODE(4,printDoubleMatrix("result",result,n,p));
+                    buf,&n); // R, ld = n
+    DBG_CODE(4,printDoubleMatrix("result",buf,n,p));
 
     // mean Mahalanobis distance from origin to rows of X
     // R: mean(sqrt(rowSums((X%*%IC)*X)))
@@ -294,13 +290,13 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,int dbg) {
         double sum=0.0;
         // sum rows
         for (j=0;j<p;j++) {
-            sum+=result[i+n*j]*X[i+n*j];
+            sum+=buf[i+n*j]*X[i+n*j];
         }
         // take the square root and store in the first column of "result"
-        result[i]=sqrt(sum);
+        buf[i]=sqrt(sum);
     }
     i=1; // lda of result
-    r=F77_NAME(dasum)(&n,result,&i)/n;
+    r=F77_NAME(dasum)(&n,buf,&i)/n;
     return r;
 }
 
@@ -511,6 +507,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     double distMaha1,distMaha2;
     double *y; // temporal storage, used for `y' for `constructBetweenClusterDistanceMatrix'
     Num yn; // number of data points in `y'
+    double *distMahaBuf; // working matrix used to compute Mahalanobis distance
 
     int lda;
     int info;
@@ -608,6 +605,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     distXIndices=(int*)MEM_ALLOC(clusterCount-1,sizeof(int));
 
     y=(double *)MEM_ALLOC(n*p,sizeof(double));
+    distMahaBuf=(double*)MEM_ALLOC(n*p,sizeof(double));
 
     // members (elementary observations) of each cluster
     members=(NumList *)MEM_ALLOC(n,sizeof(NumList));
@@ -958,7 +956,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 // distMaha1 holds a vector of squares of mahalanobis distances:
                 // mean Mahalanobis distance from c1+c2 to some other cluster
                 //R: distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
-                distMaha1=computeMahalanobisDistance(xc1,xc1MemberCount,p,ic1,dbg);
+                distMaha1=computeMahalanobisDistance(xc1,xc1MemberCount,p,ic1,distMahaBuf,dbg);
                 DBG(2,"distMaha1 %g\n",distMaha1);
 
                 // compute the distance from cluster otherClusters(oi) to the newly merged cluster c1+c2
@@ -1006,7 +1004,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
                 // mean Mahalanobis distance from otherCluster to c1+c2
                 //R: distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
-                distMaha2=computeMahalanobisDistance(xc2,xc2MemberCount,p,ic2,dbg);
+                distMaha2=computeMahalanobisDistance(xc2,xc2MemberCount,p,ic2,distMahaBuf,dbg);
                 DBG(2,"distMaha2 %g\n",distMaha2);
 
                 // merge the clusterId(c1) <-> clusterId(c2) distances
@@ -1260,7 +1258,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         }
                         DBG_CODE(3,printDoubleMatrix("normalized ic1",ic1,p,p));
                     }
-                    distMaha1=computeMahalanobisDistance(y,xc1n,p,ic1,dbg);
+                    distMaha1=computeMahalanobisDistance(y,xc1n,p,ic1,distMahaBuf,dbg);
                     DBG(2,"distMaha1 %g\n",distMaha1);
 
                     // compute the distance from cluster (i2) to (i1)
@@ -1268,7 +1266,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                                                              members,i2,i1,y,
                                                              quick,dbg);
                     DBG_CODE(3,printDoubleMatrix("xc2",y,yn,p));
-                    distMaha2=computeMahalanobisDistance(y,yn,p,ic2,dbg);
+                    distMaha2=computeMahalanobisDistance(y,yn,p,ic2,distMahaBuf,dbg);
                     DBG(2,"distMaha2 %g\n",distMaha2);
 
                     // merge the clusterId(i1) <-> clusterId(i2) distances
@@ -1310,6 +1308,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     MEM_FREE(otherClustersTmp);
     MEM_FREE(distXIndices);
     MEM_FREE(y);
+    MEM_FREE(distMahaBuf);
     for (i=0;i<n;i++) {
         deallocateNumList(members[i]);
     }
