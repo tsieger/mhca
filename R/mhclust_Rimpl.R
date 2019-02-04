@@ -186,7 +186,8 @@ verb ##<< level of verbosity, the greater the more detailed
         j<-as.integer(k-(i-1)*(clusterCount-i/2)+i)
         if (dbg>1) cat(sprintf('c1=%d, c2=%d\n',i,j))
 
-        if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',s+pointCount,v,clusterId[i],clusterId[j],printClusterMembers(members[[i]]),printClusterMembers(members[[j]])))
+        if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',
+          s+pointCount,v,clusterId[i],clusterId[j],printClusterMembers(members[[i]]),printClusterMembers(members[[j]])))
 
         merging[s,1:3]<-c(clusterId[i],clusterId[j],v)
 
@@ -301,7 +302,8 @@ verb ##<< level of verbosity, the greater the more detailed
                     printWithName(iRelDistXIdx[ii])
                 }
                 distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
-                if (dbg>1) cat(sprintf('Dist from %d=%s to %d=%s: %g.\n',clusterId[otherClusters[ii]],printClusterMembers(members[[otherClusters[ii]]]),s+pointCount,printClusterMembers(c(members[[i]], members[[j]])),distX[iRelDistXIdx[ii]]))
+                if (dbg>1) cat(sprintf('Dist from %d=%s to %d=%s: %g.\n',clusterId[otherClusters[ii]],printClusterMembers(members[[otherClusters[ii]]]),
+                  s+pointCount,printClusterMembers(c(members[[i]], members[[j]])),distX[iRelDistXIdx[ii]]))
             }
         }
         members[[i]]<-c(members[[i]],members[[j]])
