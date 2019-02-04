@@ -72,83 +72,68 @@ void deallocateNumList(NumList list) {
     if (list.data!=NULL) MEM_FREE(list.data);
 }
 
+/* Global shared string buffer to hold temporary strings.
+ */
+char *strBuf=NULL;
+
 #ifdef ENABLE_DEBUGS
 /*
  * Print members of a cluster, a sequence of observation IDs.
- #
- * TODO: the return value should be freed if the memory allocation changes
  */
-const char *printMembers(NumList list) {
-    char *buf=MEM_ALLOC(20*list.n,sizeof(char));
-    char tmp[20];
+const char *getMembers(NumList list) {
     Num i;
     Num pos=0;
     for (i=0;i<list.n;i++) {
-        sprintf(tmp,"%d",C2R(list.data[i]));
-        memcpy(buf+pos,tmp,strlen(tmp));
-        pos+=strlen(tmp);
+        sprintf(strBuf+pos,"%d",C2R(list.data[i]));
+        pos+=strlen(strBuf+pos);
         if (i<list.n-1) {
-            buf[pos++]=' ';
+            strBuf[pos++]=' ';
         }
     }
-	buf[pos]=0;
-    return buf;
+	strBuf[pos]=0;
+    return strBuf;
 }
 
 /*
  * Print matrix of doubles.
- *
- * TODO: the return value should be freed if the memory allocation changes
  */
 void printDoubleMatrix(const char *name,double *x,Num rows,Num cols) {
     //Rprintf("printDoubleMatrix(cols=%d)\n",cols);
-    char *buf=MEM_ALLOC(100*cols,sizeof(char));
-    char tmp[100];
     Num i,j;
     Rprintf("%s:\n",name);
     if (rows>0 && cols>0) {
         for (i=0;i<rows;i++) {
             Num pos=0;
             for (j=0;j<cols;j++) {
-                sprintf(tmp,"%.4f%s",x[i+rows*j],j<cols-1?"  ":"");
-                memcpy(buf+pos,tmp,strlen(tmp));
-                pos+=strlen(tmp);
+                sprintf(strBuf+pos,"% .4f%s",x[i+rows*j],j<cols-1?"  ":"");
+                pos+=strlen(strBuf+pos);
             }
-            buf[pos]=0;
-            Rprintf("    %s\n",buf);
+            strBuf[pos]=0;
+            Rprintf("    %s\n",strBuf);
         }
     }
 }
 
 /*
  * Print a row of a matrix of doubles.
- *
- * TODO: the return value should be freed if the memory allocation changes
  */
 void printDoubleMatrixRow(const char *name,double *x,Num rows,Num cols,Num row) {
-    char *buf=MEM_ALLOC(100*cols,sizeof(char));
-    char tmp[100];
     Num j;
     Rprintf("%s:\n",name);
     if (rows>0 && cols>0) {
         Num pos=0;
         for (j=0;j<cols;j++) {
-            sprintf(tmp,"%.3f%s",x[row+rows*j],j<cols-1?"  ":"");
-            memcpy(buf+pos,tmp,strlen(tmp));
-            pos+=strlen(tmp);
+            sprintf(strBuf+pos,"% .4f%s",x[row+rows*j],j<cols-1?"  ":"");
+            pos+=strlen(strBuf+pos);
         }
-        buf[pos]=0;
-        Rprintf("    %s\n",buf);
+        strBuf[pos]=0;
+        Rprintf("    %s\n",strBuf);
     }
 }
 /*
  * Print distance matrix (the lower triangle annotated with indices).
- *
- * TODO: the return value should be freed if the memory allocation changes
  */
 void printDistMatrix(const char *name,double *x,Num n,double inversionFactor) {
-    char *buf=MEM_ALLOC(100*n,sizeof(char));
-    char tmp[100];
     Num i,j,pos;
 
     /*    1 2 3 4
@@ -167,62 +152,54 @@ void printDistMatrix(const char *name,double *x,Num n,double inversionFactor) {
         // print header
         pos=0;
         for (i=0;i<n-1;i++) { // i iterates over columns
-            sprintf(tmp," %9d",C2R(i));
-            memcpy(buf+pos,tmp,strlen(tmp));
-            pos+=strlen(tmp);
+            sprintf(strBuf+pos," %9d",C2R(i));
+            pos+=strlen(strBuf+pos);
         }
-        buf[pos]=0;
-        Rprintf("        %s\n",buf);
+        strBuf[pos]=0;
+        Rprintf("        %s\n",strBuf);
 
         // print data rows
         for (j=1;j<n;j++) { // cluster to, in rows
             pos=0;
             for (i=0;i<n-1;i++) { // cluster from, in columns
                 if (i<j) {
-                    sprintf(tmp," %9.6f",inversionFactor-x[R2C(n*(C2R(i)-1) - C2R(i)*(C2R(i)-1)/2 + C2R(j)-C2R(i))]);
+                    sprintf(strBuf+pos," %9.6f",inversionFactor-x[R2C(n*(C2R(i)-1) - C2R(i)*(C2R(i)-1)/2 + C2R(j)-C2R(i))]);
                 } else {
-                    sprintf(tmp,"          ");
+                    sprintf(strBuf+pos,"          ");
                 }
-                memcpy(buf+pos,tmp,strlen(tmp));
-                pos+=strlen(tmp);
+                pos+=strlen(strBuf+pos);
             }
-            buf[pos]=0;
+            strBuf[pos]=0;
             // prepend and append row number
-            Rprintf("    %3d %s    %3d \n",j+1,buf,j+1);
+            Rprintf("    %3d %s    %3d \n",j+1,strBuf,j+1);
         }
 
         // print trailer
         pos=0;
         for (i=0;i<n-1;i++) {
-            sprintf(tmp," %9d",i+1);
-            memcpy(buf+pos,tmp,strlen(tmp));
-            pos+=strlen(tmp);
+            sprintf(strBuf+pos," %9d",i+1);
+            pos+=strlen(strBuf+pos);
         }
-        buf[pos]=0;
-        Rprintf("        %s\n",buf);
+        strBuf[pos]=0;
+        Rprintf("        %s\n",strBuf);
     }
 }
 
 /*
  * Print matrix of integers (Num's).
- *
- * TODO: the return value should be freed if the memory allocation changes
  */
 void printNumMatrix(const char *name,Num *x,Num rows,Num cols) {
-    char *buf=MEM_ALLOC(20*cols,sizeof(char));
-    char tmp[20];
     Num i,j;
     Rprintf("%s:\n",name);
     if (cols>0) {
         for (i=0;i<rows;i++) {
             Num pos=0;
             for (j=0;j<cols;j++) {
-                sprintf(tmp,"%d%s",x[i+rows*j],j<cols-1?"  ":"");
-                memcpy(buf+pos,tmp,strlen(tmp));
-                pos+=strlen(tmp);
+                sprintf(strBuf+pos,"%d%s",x[i+rows*j],j<cols-1?"  ":"");
+                pos+=strlen(strBuf+pos);
             }
-            buf[pos]=0;
-            Rprintf("    %s\n",buf);
+            strBuf[pos]=0;
+            Rprintf("    %s\n",strBuf);
         }
     }
 }
@@ -538,8 +515,6 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     int lda;
     int info;
 
-    char strBuffer[100];
-
 	dbg=*INTEGER(Verb);
 	DBG(2,"mhclust_ called\n");
     DBG(2,"verb: %d\n",dbg);
@@ -571,6 +546,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     n=dimX[0]; // number of elementary points subject to clustering (merging)
     DBG(2,"n=%d\n",n);
+    // Allocate the global shared string buffer that should hold the string
+    // representation of a list of cluster members (i.e. at most `n' integers)
+    // as well as the representation of the distance matrix (i.e. `n*(n-1)/2'
+    // real values). Thus, we reserve `c*n' space with quite generous constant
+    // `c' to hold e.g. long decimal expansion of real-valued distances.
+    strBuf=MEM_ALLOC(20*n*(n-1)/2,sizeof(char));
     if (distXLen!=n*(n-1)/2) error("invalid distXLen");
     p=dimX[1]; // number of dimensions of the feature space
     DBG(2,"p=%d\n",p);
@@ -683,10 +664,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         Num source,target,count;
         Num distXIndicesLen;
 
-        DBG_CODE(3,{
+        DBG_CODE(3, {
             DBGU("\n====================== step %d ============================\n",s);
             for (i=0;i<clusterCount;i++) {
-                DBGU("members[%d]: %s\n",C2R(i),printMembers(members[i]));
+                DBGU("members[%d]: %s\n",C2R(i),getMembers(members[i]));
             }
             for (i=0;i<clusterCount;i++) {
                 DBGU("invcov[%d]: \n",i);
@@ -761,7 +742,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG(2,"c1=%d, c2=%d\n",C2R(c1),C2R(c2));
 
         //R: if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',s+n,v,clusterId[c1],clusterId[c2],printMembers(members[[c1]]),printMembers(members[[c2]])))
-        DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),printMembers(members[c1]),printMembers(members[c2]));
+        DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),getMembers(members[c1]),getMembers(members[c2]));
         //R: merging[s,1:3]<-c(clusterId[i],clusterId[c2],v);
         merging[s]=C2R(clusterId[c1]);
         merging[s+(n-1)]=C2R(clusterId[c2]);
@@ -890,10 +871,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         //R: centroid[c1,]<-(clusterSize[clusterId[c1]]*centroid[c1,,drop=FALSE] + clusterSize[clusterId[c2]]*centroid[c2,,drop=FALSE])/
         //R:      (clusterSize[clusterId[c1]] + clusterSize[clusterId[c2]]) */
         DBG_CODE(2,{
-            sprintf(strBuffer,"centroid[c1=%d]",C2R(c1));
-            printDoubleMatrixRow(strBuffer,centroid,clusterCount,p,c1);
-            sprintf(strBuffer,"centroid[c2=%d]",C2R(c2));
-            printDoubleMatrixRow(strBuffer,centroid,clusterCount,p,c2);
+            sprintf(strBuf,"centroid[c1=%d]",C2R(c1));
+            printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
+            sprintf(strBuf,"centroid[c2=%d]",C2R(c2));
+            printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c2);
         });
         clusterSizeI=clusterSize[clusterId[c1]];
         clusterSizeJ=clusterSize[clusterId[c2]];
@@ -903,8 +884,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 (clusterSizeI+clusterSizeJ);
         }
         DBG_CODE(2,{
-            sprintf(strBuffer,"updated centroid[c1=%d]",C2R(c1));
-            printDoubleMatrixRow(strBuffer,centroid,clusterCount,p,c1);
+            sprintf(strBuf,"updated centroid[c1=%d]",C2R(c1));
+            printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
         });
         
         ///////////////////////////////////////////////////////////////
@@ -937,7 +918,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
                 for (ii=0;ii<clusterCount;ii++) {
                     DBG(3,"MEMBERS[%d]: ",ii);
-                    DBG(3,"%s\n",printMembers(members[ii]));
+                    DBG(3,"%s\n",getMembers(members[ii]));
                 }
                 // compute the distance from the newly merged cluster c1+c2 to cluster otherClusters(oi)
 
@@ -962,8 +943,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 }
                 DBG_CODE(3,printDoubleMatrix("xc1",xc1,xc1MemberCount,p));
                 DBG_CODE(3,{
-                    sprintf(strBuffer,"centroid[c1=%d]",C2R(c1));
-                    printDoubleMatrixRow(strBuffer,centroid,clusterCount,p,c1);
+                    sprintf(strBuf,"centroid[c1=%d]",C2R(c1));
+                    printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
                 });
                 //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
                 for (i=0;i<p;i++) {
@@ -993,8 +974,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 }
                 DBG_CODE(3,printDoubleMatrix("xc2",xc2,xc2MemberCount,p));
                 DBG_CODE(3,{
-                    sprintf(strBuffer,"centroid[oi=%d]",C2R(otherCluster));
-                    printDoubleMatrixRow(strBuffer,centroid,clusterCount,p,otherCluster);
+                    sprintf(strBuf,"centroid[oi=%d]",C2R(otherCluster));
+                    printDoubleMatrixRow(strBuf,centroid,clusterCount,p,otherCluster);
                 });
 
                 //R: xc2<-xc2-matrix(centroid[otherClusters[oi],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
@@ -1047,8 +1028,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG(3,"otherCluster %d\n",C2R(otherCluster));
                 //DBG("Dist from %d=(%s)\n",C2R(clusterId[otherCluster]),printMembers(members[otherCluster]));
                 DBG(2,"Dist from %d=(%s) to %d=(%s %s): %g.\n",
-                    C2R(clusterId[otherCluster]),printMembers(members[otherCluster]),
-                    C2R(s+n),printMembers(members[c1]),printMembers(members[c2]),
+                    C2R(clusterId[otherCluster]),getMembers(members[otherCluster]),
+                    C2R(s+n),getMembers(members[c1]),getMembers(members[c2]),
                     maxDistX-distX[distXIdx]);
             }
             // move distX values if some distance was below 0 (in that case
@@ -1316,6 +1297,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 	DBG(2,"mhclust_ cleaning\n");
 
     MEM_FREE(distXTmp);
+    MEM_FREE(strBuf);
     MEM_FREE(covMeansTmp);
     MEM_FREE(clusterSize);
     MEM_FREE(clusterId);
