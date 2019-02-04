@@ -13,19 +13,21 @@
 #include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
 
-#if 01
+// enable debugs and progress info
+#define ENABLE_DEBUGS
+
+#ifdef ENABLE_DEBUGS
 // debug print (unconditional)
 # define DBGU(...) Rprintf(__VA_ARGS__)
 // debug code run conditionally on the value of dbgLevel
 # define DBG_CODE(dbgLevel,...) if (dbg>=dbgLevel) __VA_ARGS__
 // debug print (conditional on the value of dbgLevel)
 # define DBG(dbgLevel,...) DBG_CODE(dbgLevel,DBGU(__VA_ARGS__))
-#else // debug completely disabled
+#else // debugs completely disabled
 # define DBGU(...)
 # define DBG_CODE(dbgLevel,...)
 # define DBG(dbgLevel,...)
 #endif
-
 
 // assert
 #if 01 // being on the safe side
@@ -70,6 +72,7 @@ void deallocateNumList(NumList list) {
     if (list.data!=NULL) MEM_FREE(list.data);
 }
 
+#ifdef ENABLE_DEBUGS
 /*
  * Print members of a cluster, a sequence of observation IDs.
  #
@@ -223,6 +226,7 @@ void printNumMatrix(const char *name,Num *x,Num rows,Num cols) {
         }
     }
 }
+#endif // ENABLE_DEBUGS
 
 /*
  * Compute the sample covariance estimate.
