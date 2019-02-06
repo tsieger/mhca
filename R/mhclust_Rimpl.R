@@ -252,8 +252,8 @@ verb ##<< level of verbosity, the greater the more detailed
                 if (dbg>2) printWithName(ic1)
             }
             for (ii in seq(along=otherClusters)) {
-                if (dbg>1) printWithName(ii)
-                if (dbg>1) printWithName(otherClusters[ii])
+                if (dbg>2) printWithName(ii)
+                if (dbg>2) printWithName(otherClusters[ii])
       
                 # compute the distance from the newly merged cluster i+j to cluster otherClusters(ii)
                 if (quick) {
@@ -261,14 +261,14 @@ verb ##<< level of verbosity, the greater the more detailed
                 } else {
                     xc1<-x[members[[otherClusters[ii]]],,drop=FALSE]
                 }
-                if (dbg>2) printWithName(xc1)
-                if (dbg>2) printWithName(centroid[i,,drop=FALSE])
+                if (dbg>3) printWithName(xc1)
+                if (dbg>3) printWithName(centroid[i,,drop=FALSE])
                 xc1<-xc1-matrix(centroid[i,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-                if (dbg>2) printWithName(xc1)
+                if (dbg>3) printWithName(xc1)
                 # distMaha1 holds a vector of squares of mahalanobis distances:
                 # mean Mahalanobis distance from i+j to some other cluster
                 distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
-                if (dbg>1) printWithName(distMaha1)
+                if (dbg>2) printWithName(distMaha1)
 
                 # compute the distance from cluster otherClusters(ii) to the newly merged cluster i+j
                 if (quick) {
@@ -276,33 +276,33 @@ verb ##<< level of verbosity, the greater the more detailed
                 } else {
                     xc2<-xij
                 }
-                if (dbg>2) printWithName(xc2)
-                if (dbg>2) printWithName(centroid[otherClusters[ii],,drop=FALSE])
+                if (dbg>3) printWithName(xc2)
+                if (dbg>3) printWithName(centroid[otherClusters[ii],,drop=FALSE])
                 xc2<-xc2-matrix(centroid[otherClusters[ii],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
-                if (dbg>2) printWithName(xc2)
-                #if (dbg>2) printWithName(centroid[otherClusters[ii],])
-                #if (dbg>2) printWithName(invcov[[otherClusters[ii]]])
+                if (dbg>3) printWithName(xc2)
+                #if (dbg>3) printWithName(centroid[otherClusters[ii],])
+                #if (dbg>3) printWithName(invcov[[otherClusters[ii]]])
                 ic2<-invcov[[otherClusters[ii]]]
-                if (dbg>2) printWithName(ic2)
+                if (dbg>3) printWithName(ic2)
                 if (normalize || fullMahalClusterCount < clusterCount-1) {
                     ic2<-ic2 / detsSqrt[otherClusters[ii]]
-                    if (dbg>2) printWithName(ic2)
+                    if (dbg>3) printWithName(ic2)
                 }
                 # mean Mahalanobis distance
                 distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
-                if (dbg>1) printWithName(distMaha2)
+                if (dbg>2) printWithName(distMaha2)
 
                 # merge the clusterId(i) <-> clusterId(j) distances
                 iRelDistXIdx<-c(otherClusters1*(clusterCount-(otherClusters1+1)/2)-clusterCount+i,
                     i*(clusterCount-(i+1)/2)-clusterCount+otherClusters2,
                     i*(clusterCount-(i+1)/2)-clusterCount+otherClusters3)
-                if (dbg>3) {
+                if (dbg>4) {
                     printWithName(iRelDistXIdx)
                     printWithName(ii)
                     printWithName(iRelDistXIdx[ii])
                 }
                 distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
-                if (dbg>1) cat(sprintf('Dist from %d=%s to %d=%s: %g.\n',clusterId[otherClusters[ii]],printClusterMembers(members[[otherClusters[ii]]]),
+                if (dbg>2) cat(sprintf('Dist from %d=%s to %d=%s: %g.\n',clusterId[otherClusters[ii]],printClusterMembers(members[[otherClusters[ii]]]),
                   s+pointCount,printClusterMembers(c(members[[i]], members[[j]])),distX[iRelDistXIdx[ii]]))
             }
         }
