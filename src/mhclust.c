@@ -986,10 +986,13 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG(3,"oi: %d\n",C2R(oi));
                 DBG(3,"otherCluster: %d\n",C2R(otherCluster));
 
-                for (ii=0;ii<clusterCount;ii++) {
-                    DBG(4,"MEMBERS[%d]: ",ii);
-                    DBG(4,"%s\n",getMembers(members[ii],clusterSize[clusterId[ii]],strBuf));
-                }
+                DBG_CODE(4,{
+                    printDoubleMatrix("normalized ic1",ic1,p,p);
+                    for (ii=0;ii<clusterCount;ii++) {
+                        DBGU("MEMBERS[%d]: ",ii);
+                        DBGU("%s\n",getMembers(members[ii],clusterSize[clusterId[ii]],strBuf));
+                    }
+                });
                 // compute the distance from the newly merged cluster c1+c2 to cluster otherClusters(oi)
 
                 if (quick) {
@@ -1013,9 +1016,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         }
                     }
                 }
-                DBG_CODE(4,printDoubleMatrix("xc1",xc1,xc1MemberCount,p));
                 DBG_CODE(4,{
-                    sprintf(strBuf,"centroid[c1=%d]",C2R(c1));
+                    printDoubleMatrix("xc1",xc1,xc1MemberCount,p);
+                    sprintf(strBuf,"centroid[c1=%d]:",C2R(c1));
                     printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
                 });
                 //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
@@ -1044,8 +1047,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     xc2MemberCount=xijN;
                     memcpy(xc2,xij,sizeof(*xij)*xijN*p);
                 }
-                DBG_CODE(4,printDoubleMatrix("xc2",xc2,xc2MemberCount,p));
                 DBG_CODE(4,{
+                    printDoubleMatrix("xc2",xc2,xc2MemberCount,p);
                     sprintf(strBuf,"centroid[oi=%d]",C2R(otherCluster));
                     printDoubleMatrixRow(strBuf,centroid,clusterCount,p,otherCluster);
                 });
@@ -1189,7 +1192,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             printLongNumMatrix("distXIndices part 3 (c1 ... c2)",distXIndices+c1+1,1,c2-c1-1);
             printLongNumMatrix("distXIndices part 4 (c2 ...)",distXIndices+c2,1,clusterCount-c2-1);
             printLongNumMatrix("distXIndices",distXIndices,1,distXIndicesLen);
-            DBG_CODE(4,printDistMatrix("distX pre update",distX,clusterCount,maxDistX));
+            printDistMatrix("distX pre update",distX,clusterCount,maxDistX);
         });
         /*
          * source:  0 1 2 3 4 5 6 7 8 9 A B C
@@ -1234,14 +1237,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             source=distXIndices[ii]+1;
             if (ii+1<distXIndicesLen) {
                 count=distXIndices[ii+1]-distXIndices[ii]-1;
-            } else {
-                count=distXLen-distXIndices[ii]-1;
-            }
-            if (ii+1<distXIndicesLen) {
                 DBG(4," distXIndices[i=%ld]=%ld, distXIndices[ii=%ld]=%ld, distXIndices[ii+1=%ld]=%ld\n",
                     i,distXIndices[i],ii,distXIndices[ii],ii+1,distXIndices[ii+1]);
             } else {
-                DBG(4," distXIndices[i=%ld]=%ld, distXIndices[ii=%ld]=%ld\n",i,distXIndices[i],ii,distXIndices[ii]);
+                count=distXLen-distXIndices[ii]-1;
+                DBG(4," distXIndices[i=%ld]=%ld, distXIndices[ii=%ld]=%ld\n",
+                    i,distXIndices[i],ii,distXIndices[ii]);
             }
             DBG_CODE(5,{
                 for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
@@ -1250,8 +1251,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             DBG(4,"memmove target %ld (%p, value %g), source %ld (%p, value %g), len %ld (%ld)\n",
                 target,distX+target,maxDistX-distX[target],source,distX+source,maxDistX-distX[source],count,sizeof(*distX)*count);
             memmove(distX+target,distX+source,sizeof(*distX)*count);
-            DBG(5,"target %ld (%p, value %g)\n",target,distX+target,maxDistX-distX[target]);
             DBG_CODE(5,{
+                DBGU("target %ld (%p, value %g)\n",target,distX+target,maxDistX-distX[target]);
                 for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
                 printDoubleMatrix("distX post move",distXTmp,1,((long)clusterCount-1)*(clusterCount-2)/2);
             });
