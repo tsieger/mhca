@@ -1,7 +1,7 @@
 Package: mhca
 Type: Package
 Title: Mahalanobis HCA
-Version: 0.2
+Version: 0.2.9000
 Date: 2019-02-06
 Author: Tomas Sieger, Karel Fiser
 Depends: 
