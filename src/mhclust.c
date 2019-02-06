@@ -50,56 +50,55 @@
 #define MEM_ALLOC(n,size) R_alloc(n,size)
 #define MEM_FREE(p)
 
-typedef int Num;
+typedef int Num; // e.g. cluster number
+typedef int LongNum; // e.g. index into distance matrix (needs to be an int in order e.g. to be passed to 'idamax')
+typedef unsigned int MatrixIndex; // e.g. index into distance matrix (in our internal code)
 
-typedef struct _NumList {
-    Num *data;
-    Num n;
-    Num capacity;
-} NumList;
-NumList allocateNumList(Num capacity) {
-    NumList list;
-    list.data=(Num*)MEM_ALLOC(capacity,sizeof(Num));
-    list.capacity=capacity;
-    list.n=0;
-    return list;
-}
-void deallocateNumList(NumList list) {
-    if (list.data!=NULL) MEM_FREE(list.data);
-}
-
-/* Global shared string buffer to hold temporary strings.
+/* Global shared string buffers to hold temporary strings.
  */
-char *strBuf=NULL;
+char *strBuf=NULL; // a long buffer (to hold a sequence of `O(n^2)' real numbers)
+char *strBufShort=NULL; // a short buffer (to hold a sequence of `O(n)' integers)
+char *strBufShort2=NULL; // a short buffer (to hold a sequence of `O(n)' integers)
 
 #ifdef ENABLE_DEBUGS
 /*
- * Print members of a cluster, a sequence of observation IDs.
+ * Get members of a cluster, a sequence of string form of IDs of observations.
+ *
+ * Arguments:
+ *  clusterMembers - array of cluster members
+ *  memberCount - number of members
+ *  buf - buffer to store the string prepresentation of members
  */
-const char *getMembers(NumList list) {
+const char *getMembers(const Num *clusterMembers,Num memberCount,char *buf) {
     Num i;
     Num pos=0;
-    for (i=0;i<list.n;i++) {
-        sprintf(strBuf+pos,"%d",C2R(list.data[i]));
-        pos+=strlen(strBuf+pos);
-        if (i<list.n-1) {
-            strBuf[pos++]=' ';
+    for (i=0;i<memberCount;i++) {
+        sprintf(buf+pos,"%d",C2R(clusterMembers[i]));
+        pos+=strlen(buf+pos);
+        if (i<memberCount-1) {
+            buf[pos++]=' ';
         }
     }
-	strBuf[pos]=0;
-    return strBuf;
+    buf[pos]=0;
+    return buf;
 }
 
 /*
  * Print matrix of doubles.
+ *
+ * Arguments:
+ *  name - matrix identification
+ *  x - matrix
+ *  rows - number of rows
+ *  cols - number of columns
  */
-void printDoubleMatrix(const char *name,double *x,Num rows,Num cols) {
+void printDoubleMatrix(const char *name,const double *x,MatrixIndex rows,MatrixIndex cols) {
     //Rprintf("printDoubleMatrix(cols=%d)\n",cols);
-    Num i,j;
+    MatrixIndex i,j;
     Rprintf("%s:\n",name);
     if (rows>0 && cols>0) {
         for (i=0;i<rows;i++) {
-            Num pos=0;
+            MatrixIndex pos=0;
             for (j=0;j<cols;j++) {
                 sprintf(strBuf+pos,"% .4f%s",x[i+rows*j],j<cols-1?"  ":"");
                 pos+=strlen(strBuf+pos);
@@ -112,12 +111,19 @@ void printDoubleMatrix(const char *name,double *x,Num rows,Num cols) {
 
 /*
  * Print a row of a matrix of doubles.
+ *
+ * Arguments:
+ *  name - matrix identification
+ *  x - matrix
+ *  rows - number of rows
+ *  cols - number of columns
+ *  row - row index
  */
-void printDoubleMatrixRow(const char *name,double *x,Num rows,Num cols,Num row) {
-    Num j;
+void printDoubleMatrixRow(const char *name,const double *x,MatrixIndex rows,MatrixIndex cols,MatrixIndex row) {
+    MatrixIndex j;
     Rprintf("%s:\n",name);
     if (rows>0 && cols>0) {
-        Num pos=0;
+        MatrixIndex pos=0;
         for (j=0;j<cols;j++) {
             sprintf(strBuf+pos,"% .4f%s",x[row+rows*j],j<cols-1?"  ":"");
             pos+=strlen(strBuf+pos);
@@ -126,10 +132,17 @@ void printDoubleMatrixRow(const char *name,double *x,Num rows,Num cols,Num row) 
         Rprintf("    %s\n",strBuf);
     }
 }
+
 /*
  * Print distance matrix (the lower triangle annotated with indices).
+ *
+ * Arguments:
+ *   name - matrix identification
+ *   x - distance matrix
+ *   n - number of observations the distance matrix was computed for
+ *   inversionFactor - the distances are `inversionFactor - x[...]'
  */
-void printDistMatrix(const char *name,double *x,Num n,double inversionFactor) {
+void printDistMatrix(const char *name,const double *x,Num n,double inversionFactor) {
     Num i,j,pos;
 
     /*    1 2 3 4
@@ -159,7 +172,8 @@ void printDistMatrix(const char *name,double *x,Num n,double inversionFactor) {
             pos=0;
             for (i=0;i<n-1;i++) { // cluster from, in columns
                 if (i<j) {
-                    sprintf(strBuf+pos," %9.6f",inversionFactor-x[R2C(n*(C2R(i)-1) - C2R(i)*(C2R(i)-1)/2 + C2R(j)-C2R(i))]);
+                    // note the '(long)x' below not to let the 'int*int' overflow
+                    sprintf(strBuf+pos," %9.6f",inversionFactor-x[R2C(((long)n)*(C2R(i)-1) - ((long)C2R(i))*(C2R(i)-1)/2 + C2R(j)-C2R(i))]);
                 } else {
                     sprintf(strBuf+pos,"          ");
                 }
@@ -183,13 +197,44 @@ void printDistMatrix(const char *name,double *x,Num n,double inversionFactor) {
 
 /*
  * Print matrix of integers (Num's).
+ *
+ * Arguments:
+ *  name - matrix identification
+ *  x - matrix
+ *  rows - number of rows
+ *  cols - number of columns
  */
-void printNumMatrix(const char *name,Num *x,Num rows,Num cols) {
-    Num i,j;
+void printNumMatrix(const char *name,const Num *x,MatrixIndex rows,MatrixIndex cols) {
+    MatrixIndex i,j;
     Rprintf("%s:\n",name);
     if (cols>0) {
         for (i=0;i<rows;i++) {
-            Num pos=0;
+            MatrixIndex pos=0;
+            for (j=0;j<cols;j++) {
+                sprintf(strBuf+pos,"%d%s",x[i+rows*j],j<cols-1?"  ":"");
+                pos+=strlen(strBuf+pos);
+            }
+            strBuf[pos]=0;
+            Rprintf("    %s\n",strBuf);
+        }
+    }
+}
+
+/*
+ * Print matrix of long integers (LongNum's).
+ *
+ * Arguments:
+ *  name - matrix identification
+ *  x - matrix
+ *  rows - number of rows
+ *  cols - number of columns
+ */
+void printLongNumMatrix(const char *name,const LongNum *x,MatrixIndex rows,MatrixIndex cols) {
+    MatrixIndex i,j;
+    Rprintf("%s:\n",name);
+    if (cols>0) {
+        for (i=0;i<rows;i++) {
+            MatrixIndex pos=0;
             for (j=0;j<cols;j++) {
                 sprintf(strBuf+pos,"%d%s",x[i+rows*j],j<cols-1?"  ":"");
                 pos+=strlen(strBuf+pos);
@@ -311,19 +356,18 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,i
  *  p - number of columns of `x'
  *  centroid - matrix of centroids, of size `clusterCount x p',
  *      stored in column-major style
- *  members - members of individual clusters (see the definition of
- *      `members' below)
- *  i=clusterFrom - index of cluster for which to compute the
- *      representants
+ *  cluster - index of cluster for which to compute the representants
+ *  clusterMembers - members of the given cluster
+ *  memberCount - number of members of the given cluster
  *  y - where to store the resulting matrix, of size `yn x p'
  *  ynPtr - pointer to hold `yn', the number of rows of the result
  *  quickMode - boolean flag determining whether to use all members of
  *      clusterFrom, or only its centroid
  * dbg
  */
-Num constructRepresentantsOfCluster(double *x,Num n,Num p,
-                                    double *centroid,NumList *members,
-                                    Num cluster,double *y,int quickMode,int dbg) {
+Num constructRepresentantsOfCluster(double *x,Num n,Num p,double *centroid,
+                                    Num cluster,Num *clusterMembers,Num memberCount,
+                                    double *y,int quickMode,int dbg) {
     Num i,j,yn;
 
     if (quickMode) {
@@ -332,14 +376,13 @@ Num constructRepresentantsOfCluster(double *x,Num n,Num p,
             y[i]=centroid[cluster+n*i];
         }
     } else {
-        yn=members[cluster].n;
-        Num *mmbrs=members[cluster].data;
+        yn=memberCount;
         for (i=0;i<p;i++) {
             Num offset1=yn*i;
             Num offset2=n*i;
             Num cumI=0;
             for (j=0;j<yn;j++,cumI++) {
-                y[cumI+offset1]=x[mmbrs[j]+offset2];
+                y[cumI+offset1]=x[clusterMembers[j]+offset2];
             }
         }
     }
@@ -359,7 +402,7 @@ Num constructRepresentantsOfCluster(double *x,Num n,Num p,
  *  p - number of columns of `Xi'
  *  centroid - matrix of centroids of size `clusterCount x p'
  *  clusterCount - number of clusters = number of rows of `centroid'
- *  j=clusterTo - index of target cluster
+ *  clusterTo - index of target cluster
  *  y - where to store the resulting matrix of size `n x p'
  *  quickMode - boolean flag determining whether to use all members of
  *      clusterFrom, or only its centroid
@@ -373,7 +416,7 @@ void constructBetweenClusterDistanceMatrixFromXi(double *Xi,Num n,Num p,
 
     DBG_CODE(4,printDoubleMatrix("y",Xi,n,p));
     DBG_CODE(4,printDoubleMatrixRow("centroid[clusterTo]",centroid,clusterCount,p,clusterTo));
-    /* xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE) */
+    //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
     for (i=0;i<p;i++) {
         long offset1=n*i;
         long offset2=clusterCount*i;
@@ -396,10 +439,10 @@ void constructBetweenClusterDistanceMatrixFromXi(double *Xi,Num n,Num p,
  *  n - number of rows of `x'
  *  clusterCount - number of clusters = number of rows of `centroid'
  *  centroid - matrix of centroids of size `clusterCount x p'
- *  members - members of individual clusters (see the definition of
- *      members)
- *  i=clusterFrom - index of source cluster
- *  j=clusterTo - index of target cluster
+ *  clusterFrom - index of source cluster
+ *  clusterTo - index of target cluster
+ *  clusterMembers - members of the source cluster
+ *  memberCount - number of members of the source cluster
  *  y - where to store resulting the matrix of size `yn x p'
  *  ynPtr - pointer to hold `yn', the number of rows of the result
  *  quickMode - boolean flag determining whether to use all members of
@@ -408,13 +451,14 @@ void constructBetweenClusterDistanceMatrixFromXi(double *Xi,Num n,Num p,
  */
 Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
                                           double *centroid,Num clusterCount,
-                                          NumList *members,
                                           Num clusterFrom,Num clusterTo,
+                                          Num *clusterMembers,Num memberCount,
                                           double *y,
                                           int quickMode,int dbg) {
     Num i,j,yn;
-    yn=constructRepresentantsOfCluster(x,n,p,centroid,members,
-                                       clusterFrom,y,quickMode,dbg);
+    yn=constructRepresentantsOfCluster(x,n,p,centroid,clusterFrom,
+                                       clusterMembers,memberCount,
+                                       y,quickMode,dbg);
     DBG_CODE(4,printDoubleMatrix("y",y,yn,p));
     DBG_CODE(4,printDoubleMatrixRow("centroid[clusterTo]",centroid,clusterCount,p,clusterTo));
     //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
@@ -477,8 +521,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     double *distX,*distXTmp; // distance matrix of x
     double maxDistX; // max value of distX
-    Num distXIdx,*distXIndices; // indices into distX
-    Num distXLen;
+    LongNum distXIdx,*distXIndices; // indices into distX
+    LongNum distXLen;
 
     Num *merging; // output argument: cluster merging
     double *height; // output argument: cluster heights
@@ -486,18 +530,20 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     double thresh;
     int normalize;
 
-    Num *clusterSize;// TODO: holds the same info as members[i].n - unfity?
-    Num *clusterId; // id of cluster contained at this specific position
+    Num *clusterSize; // the size of clusters (indexed by clusterId: clusters 1..n are of size 1, then come merged clusters)
+    Num *clusterId; // id of cluster contained in this specific position
     double detSqrt;
     double* detsSqrt; // square root of determinants of inverse covariance matrices
 
     double *weightFactor,wf1; // factors weighting inverse covariance matrix against fakeInvCov
 
-    NumList *members;
+    Num **members;
+    Num *membersPool;
+    unsigned long membersPoolPos;
+
     Num *otherClusters;
     Num *otherClustersTmp;
     Num c1,c2,s,i,j,k,oi;
-    Num cap1,cap2;
     Num clusterSizeI,clusterSizeJ;
     Num c1n,c2n,*c1indices,*c2indices;
 
@@ -512,8 +558,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     int lda;
     int info;
 
-	dbg=*INTEGER(Verb);
-	DBG(2,"mhclust_ called\n");
+    dbg=*INTEGER(Verb);
+    DBG(2,"mhclust_ called\n");
     DBG(2,"verb: %d\n",dbg);
     /*
      * dbg = 0: no debugs
@@ -540,23 +586,35 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     DBG(2,"normalize: %d\n",normalize);
     quick=*LOGICAL(Quick);
     DBG(2,"quick: %d\n",quick);
-
     n=dimX[0]; // number of elementary points subject to clustering (merging)
-    DBG(2,"n=%d\n",n);
+    DBG(2,"n: %d\n",n);
+    // check that the distance matrix can be indexed using a 'LongNum' index
+    DBG(3,"n*(n-1)/2: %ld\n",((long)n)*(n-1)/2);
+    DBG(3,"max representable length: %ld\n",(1l<<(sizeof(LongNum)*8-1))-1);
+    if (((long)n)*(n-1)/2>(1l<<(sizeof(LongNum)*8-1))-1) {
+        error("number of observations too large");
+    }
+#ifdef ENABLE_DEBUGS
     // Allocate the global shared string buffer that should hold the string
     // representation of a list of cluster members (i.e. at most `n' integers)
     // as well as the representation of the distance matrix (i.e. `n*(n-1)/2'
     // real values). Thus, we reserve `c*n' space with quite generous constant
     // `c' to hold e.g. long decimal expansion of real-valued distances.
-    strBuf=MEM_ALLOC(20*n*(n-1)/2,sizeof(char));
-    if (distXLen!=n*(n-1)/2) error("invalid distXLen");
+    DBG(2,"allocating %lu\n",20l*n*(n-1)/2*sizeof(char)); // note the '20l' not to let the 'int*int' overflow
+    strBuf=MEM_ALLOC(20l*n*(n-1)/2,sizeof(char)); // note the '20l' not to let the 'int*int' overflow
+    // two more another string buffers (shorter ones)
+    strBufShort=MEM_ALLOC(20*n,sizeof(char));
+    strBufShort2=MEM_ALLOC(20*n,sizeof(char));
+#endif
+    DBG(2,"length of distX: %ld\n",(long)distXLen);
+    DBG(3,"expected distX len: %ld\n",((long)n)*(n-1)/2); // note the '(long)x' not to let the 'int*int' overflow
+    if (distXLen!=((long)n)*(n-1)/2) error("invalid distXLen");
     p=dimX[1]; // number of dimensions of the feature space
-    DBG(2,"p=%d\n",p);
+    DBG(2,"p: %d\n",p);
     covMeansTmp=(double *)MEM_ALLOC(p,sizeof(double));
     DBG_CODE(3,printDoubleMatrix("x",x,n,p));
     covXijLength=p*p;
 
-    DBG(2,"length of distX: %d\n",distXLen);
     DBG_CODE(3,printDoubleMatrix("distX",distX,1,distXLen));
     // convert distX to C-distX, such that we could find the maximum absolute value
     // instead of the minimum value
@@ -577,6 +635,22 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     clusterSize=(int *)MEM_ALLOC(2*clusterCount-1,sizeof(int));
     for (i=0;i<clusterCount;i++) clusterSize[i]=1;
     for (i=0;i<clusterCount-1;i++) clusterSize[clusterCount+i]=0;
+    // members (elementary observations) of each cluster
+    // To store the cluster members during the clustering, there is at
+    // most the cummulative need for
+    // `1 + 1 + ... + 1 + 2 + 3 + ... + n = n+(n-1)*(n+2)/2' members.
+    // (The first `n' `1s' stand for individual observations, then the
+    // worst scenario is a single growing cluster accumulating a single
+    // observation on each step.) This is a worst-case quadratic space,
+    // while the optimal case would take only `O(n*log2(n))' space.
+    membersPool=(Num*)MEM_ALLOC(n+((long)n-1)*(n+2)/2,sizeof(Num));
+    // note the '(long)x' above not to let the 'int*int' overflow
+    membersPoolPos=0;
+    members=(Num**)MEM_ALLOC(n,sizeof(Num*));
+    for (i=0;i<n;i++) {
+        members[i]=membersPool+membersPoolPos++;
+        *members[i]=i;
+    }
 
     // clusters being made (by merging two smaller clusters) are
     // assigned unique IDs, but reside in data structured indexed by
@@ -602,18 +676,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     otherClusters=(Num *)MEM_ALLOC(clusterCount*p,sizeof(Num));
     otherClustersTmp=(Num *)MEM_ALLOC(clusterCount*p,sizeof(Num));
 
-    distXIndices=(int*)MEM_ALLOC(clusterCount-1,sizeof(int));
+    distXIndices=(LongNum*)MEM_ALLOC(clusterCount-1,sizeof(LongNum));
 
     y=(double *)MEM_ALLOC(n*p,sizeof(double));
     distMahaBuf=(double*)MEM_ALLOC(n*p,sizeof(double));
-
-    // members (elementary observations) of each cluster
-    members=(NumList *)MEM_ALLOC(n,sizeof(NumList));
-    for (i=0;i<n;i++) {
-        members[i]=allocateNumList(10);
-        members[i].data[0]=i;
-        members[i].n=1;
-    }
 
     // inverse of covariance matrix of members of given cluster
     // (representing the shape of the clusters)
@@ -659,13 +725,13 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     // merge two closest clusters at each step `s'
     for (s=0;s<n-1;s++) {
         double v;
-        Num source,target,count;
+        LongNum source,target,count;
         Num distXIndicesLen;
 
         DBG_CODE(3, {
             DBGU("\n====================== step %d ============================\n",s);
             for (i=0;i<clusterCount;i++) {
-                DBGU("members[%d]: %s\n",C2R(i),getMembers(members[i]));
+                DBGU("members[%d]: %s\n",C2R(i),getMembers(members[i],clusterSize[clusterId[i]],strBuf));
             }
             for (i=0;i<clusterCount;i++) {
                 DBGU("invcov[%d]: \n",i);
@@ -707,8 +773,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         k=F77_CALL(idamax)(&distXLen,distX,&lda);
         ASSERT(k>0,"invalid idamax retcode");
         v=maxDistX-distX[k-1];
-        DBG(4,"found minimum %g at %d\n",v,k);
-
+        DBG(2,"found minimum %g at %d\n",v,k);
         /*
          * here 'i' and 'j' stand for 'c1' and 'c2', respectively
          * (i,j) @ k = n*(i-1) - i*(i-1)/2 + j-i
@@ -732,15 +797,20 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
          * j = (i-1)*(i/2-n)+i+k
          */
         // we are merging clusters `c1' and `c2' into a new one
-        c1=floor(clusterCount+.5-sqrt(clusterCount*clusterCount-clusterCount+.25-2*(k-1)));
-        c2=(c1-1)*(c1*.5-clusterCount)+c1+k;
+        c1=floor(clusterCount+.5-sqrt(((long)clusterCount)*clusterCount-clusterCount+.25-2l*(k-1)));
+        // note the '(long)x' above not to let the 'int*int' overflow
+        c2=((long)c1-1)*(c1*.5-clusterCount)+c1+k;
+        // note the '(long)x' above not to let the 'int*int' overflow
         // make c1 and c2 0-based
         c1=R2C(c1);
         c2=R2C(c2);
         DBG(2,"c1=%d, c2=%d\n",C2R(c1),C2R(c2));
-
+        ASSERT(c1>=0,"invalid c1");
+        ASSERT(c2>=0,"invalid c2");
         //R: if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',s+n,v,clusterId[c1],clusterId[c2],printMembers(members[[c1]]),printMembers(members[[c2]])))
-        DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),getMembers(members[c1]),getMembers(members[c2]));
+        DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),
+            getMembers(members[c1],clusterSize[clusterId[c1]],strBuf),
+            getMembers(members[c2],clusterSize[clusterId[c2]],strBufShort));
         //R: merging[s,1:3]<-c(clusterId[i],clusterId[c2],v);
         merging[s]=C2R(clusterId[c1]);
         merging[s+(n-1)]=C2R(clusterId[c2]);
@@ -755,18 +825,20 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         for (i=0;i<c1;i++) otherClusters[i]=i;
         for (i=c1+1;i<c2;i++) otherClusters[i-1]=i;
         for (i=c2+1;i<clusterCount;i++) otherClusters[i-2]=i;
-        DBG(3,"clusterCount %d\n",clusterCount);
+        DBG(3,"clusterCount: %d\n",clusterCount);
         for (i=0;i<clusterCount-2;i++) otherClustersTmp[i]=C2R(otherClusters[i]);
         DBG_CODE(3,printNumMatrix("otherClusters",otherClustersTmp,1,clusterCount-2));
 
         // get all samples constituting the merged clusters
         //R: xij<-x[c(members[[c1]],members[[c2]]),,drop=FALSE]
-        c1n=members[c1].n;
-        c2n=members[c2].n;
-        xijN=c1n+c2n;
-        c1indices=members[c1].data;
-        c2indices=members[c2].data;
+        c1n=clusterSize[clusterId[c1]];
+        c2n=clusterSize[clusterId[c2]];
         DBG(2,"c1n=%d, c2n=%d\n",c1n,c2n);
+        ASSERT(c1n>0,"invalid c1n");
+        ASSERT(c2n>0,"invalid c2n");
+        xijN=c1n+c2n;
+        c1indices=members[c1];
+        c2indices=members[c2];
         DBG(3,"constructing xij\n");
         //R: xij<-x[c(members[[c1]],members[[c2]]),,drop=FALSE]
         DBG_CODE(3,printNumMatrix("c1indices",c1indices,1,c1n));
@@ -831,8 +903,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         F77_CALL(dpotrf)("L",// Lower diagonal is used
                          &p,covXij,&p,&info);
         DBG(4,"info: %d\n",info);
-        DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
         ASSERT(info>=0,"invalid dpotrf retcode");
+        DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
         if (info==0) {
             double *cholDecomp=covXij;
             //R: detSqrt<-(1/prod(diag(c.cholDecomp)))^(2/p)
@@ -911,12 +983,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 int xc1MemberCount,xc2MemberCount;
                 int ii;
 
-                DBG(2,"oi %d\n",C2R(oi));
-                DBG(2,"otherCluster %d\n",C2R(otherCluster));
+                DBG(3,"oi: %d\n",C2R(oi));
+                DBG(3,"otherCluster: %d\n",C2R(otherCluster));
 
                 for (ii=0;ii<clusterCount;ii++) {
-                    DBG(3,"MEMBERS[%d]: ",ii);
-                    DBG(3,"%s\n",getMembers(members[ii]));
+                    DBG(4,"MEMBERS[%d]: ",ii);
+                    DBG(4,"%s\n",getMembers(members[ii],clusterSize[clusterId[ii]],strBuf));
                 }
                 // compute the distance from the newly merged cluster c1+c2 to cluster otherClusters(oi)
 
@@ -928,19 +1000,21 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     }
                 } else {
                     //R: xc1<-x[members[[otherClusters[oi]]],,drop=FALSE]
-                    xc1MemberCount=members[otherCluster].n;
+                    xc1MemberCount=clusterSize[clusterId[otherCluster]];
+                    DBG(3,"xc1MemberCount: %d\n",xc1MemberCount);
+                    ASSERT(xc1MemberCount>0,"invalid xc1MemberCount");
                     for (i=0;i<p;i++) {
                         Num offset1=xc1MemberCount*i;
                         Num offset2=n*i;
                         Num cumI=0;
-                        Num *mmbrs=members[otherCluster].data;
+                        Num *mmbrs=members[otherCluster];
                         for (j=0;j<xc1MemberCount;j++,cumI++) {
                             xc1[cumI+offset1]=x[mmbrs[j]+offset2];
                         }
                     }
                 }
-                DBG_CODE(3,printDoubleMatrix("xc1",xc1,xc1MemberCount,p));
-                DBG_CODE(3,{
+                DBG_CODE(4,printDoubleMatrix("xc1",xc1,xc1MemberCount,p));
+                DBG_CODE(4,{
                     sprintf(strBuf,"centroid[c1=%d]",C2R(c1));
                     printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
                 });
@@ -952,12 +1026,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         xc1[j+offset1]-=centroid[c1+offset2];
                     }
                 }
-                DBG_CODE(3,printDoubleMatrix("centered xc1",xc1,xc1MemberCount,p));
+                DBG_CODE(4,printDoubleMatrix("centered xc1",xc1,xc1MemberCount,p));
                 // distMaha1 holds a vector of squares of mahalanobis distances:
                 // mean Mahalanobis distance from c1+c2 to some other cluster
                 //R: distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
                 distMaha1=computeMahalanobisDistance(xc1,xc1MemberCount,p,ic1,distMahaBuf,dbg);
-                DBG(2,"distMaha1 %g\n",distMaha1);
+                DBG(3,"distMaha1 %g\n",distMaha1);
 
                 // compute the distance from cluster otherClusters(oi) to the newly merged cluster c1+c2
                 if (quick) {
@@ -970,8 +1044,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     xc2MemberCount=xijN;
                     memcpy(xc2,xij,sizeof(*xij)*xijN*p);
                 }
-                DBG_CODE(3,printDoubleMatrix("xc2",xc2,xc2MemberCount,p));
-                DBG_CODE(3,{
+                DBG_CODE(4,printDoubleMatrix("xc2",xc2,xc2MemberCount,p));
+                DBG_CODE(4,{
                     sprintf(strBuf,"centroid[oi=%d]",C2R(otherCluster));
                     printDoubleMatrixRow(strBuf,centroid,clusterCount,p,otherCluster);
                 });
@@ -984,28 +1058,28 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         xc2[j+offset1]-=centroid[otherCluster+offset2];
                     }
                 }
-                DBG_CODE(3,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
+                DBG_CODE(4,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
 
                 //R: ic2<-invcov[[otherClusters[ii]]]
                 for (i=0;i<p*p;i++) {
                     ic2[i]=invcov[p*p*otherCluster+i];
                 }
 
-                DBG_CODE(2,printDoubleMatrix("ic2",ic2,p,p));
+                DBG_CODE(4,printDoubleMatrix("ic2",ic2,p,p));
 
                 if (normalize || fullMahalClusterCount < clusterCount-1) {
-                    DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
+                    DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                         normalize,fullMahalClusterCount,clusterCount);
                     for (i=0;i<p*p;i++) {
                         ic2[i]/=detsSqrt[otherCluster];
                     }
-                    DBG_CODE(2,printDoubleMatrix("normalized ic2",ic2,p,p));
+                    DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
                 }
 
                 // mean Mahalanobis distance from otherCluster to c1+c2
                 //R: distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
                 distMaha2=computeMahalanobisDistance(xc2,xc2MemberCount,p,ic2,distMahaBuf,dbg);
-                DBG(2,"distMaha2 %g\n",distMaha2);
+                DBG(3,"distMaha2: %g\n",distMaha2);
 
                 // merge the clusterId(c1) <-> clusterId(c2) distances
                 //R: iRelDistXIdx<-c(otherClusters1*(clusterCount-(otherClusters1+1)/2)-clusterCount+c1,
@@ -1013,21 +1087,27 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 //R:     c1*(clusterCount-(c1+1)/2)-clusterCount+otherClusters3)
                 //R: distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
                 if (oi<c1) {
-                    distXIdx=R2C(C2R(otherCluster-1)*clusterCount-(C2R(otherCluster)*(C2R(otherCluster)+1))/2+C2R(c1));
+                    distXIdx=R2C(((long)C2R(otherCluster-1))*clusterCount-(((long)C2R(otherCluster))*(C2R(otherCluster)+1))/2+C2R(c1));
+                    // note the '(long)x' above not to let the 'int*int' overflow
                 } else if (oi<c2-1) {
-                    distXIdx=R2C(C2R(c1-1)*clusterCount-(C2R(c1)*(C2R(c1)+1))/2+C2R(otherCluster));
+                    distXIdx=R2C(((long)C2R(c1-1))*clusterCount-(((long)C2R(c1))*(C2R(c1)+1))/2+C2R(otherCluster));
+                    // note the '(long)x' above not to let the 'int*int' overflow
                 } else {
-                    distXIdx=R2C(C2R(c1-1)*clusterCount-(C2R(c1)*(C2R(c1)+1))/2+C2R(otherCluster));
+                    distXIdx=R2C(((long)C2R(c1-1))*clusterCount-(((long)C2R(c1))*(C2R(c1)+1))/2+C2R(otherCluster));
+                    // note the '(long)x' above not to let the 'int*int' overflow
                 }
-                DBG(4,"distXIdx %d\n",distXIdx);
+                DBG(4,"distXIdx: %ld\n",(long)distXIdx);
+                ASSERT(distXIdx>=0,"invalid distXIdx");
                 tmp=distX[distXIdx]=maxDistX-(distMaha1+distMaha2)/2;
                 if (tmp<minNewDistX) minNewDistX=tmp;
 
-                DBG(3,"otherCluster %d\n",C2R(otherCluster));
+                DBG(3,"otherCluster: %d\n",C2R(otherCluster));
                 //DBG("Dist from %d=(%s)\n",C2R(clusterId[otherCluster]),printMembers(members[otherCluster]));
-                DBG(2,"Dist from %d=(%s) to %d=(%s %s): %g.\n",
-                    C2R(clusterId[otherCluster]),getMembers(members[otherCluster]),
-                    C2R(s+n),getMembers(members[c1]),getMembers(members[c2]),
+                DBG(3,"Dist from %d=(%s) to %d=(%s %s): %g.\n",
+                    C2R(clusterId[otherCluster]),getMembers(members[otherCluster],clusterSize[clusterId[otherCluster]],strBuf),
+                    C2R(s+n),
+                    getMembers(members[c1],clusterSize[clusterId[c1]],strBufShort),
+                    getMembers(members[c2],clusterSize[clusterId[c2]],strBufShort2),
                     maxDistX-distX[distXIdx]);
             }
             // move distX values if some distance was below 0 (in that case
@@ -1035,7 +1115,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             // to get the minimum distance)
             if (minNewDistX<0) {
                 DBG(4,"moving distX by %f, old maxDistX %f\n",minNewDistX,maxDistX);
-                DBG(4,"distX[0] %f\n",distX[0]);
+                DBG(4,"distX[0]: %f\n",distX[0]);
                 for (i=0;i<distXLen;i++) distX[i]-=minNewDistX;
                 maxDistX-=minNewDistX;
                 DBG(4,"new maxDistX %f\n",maxDistX);
@@ -1048,49 +1128,27 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
          // cluster at position occupied by clusterId[c1] previously
         //DBG(2,"  updating...\n");
         //R: members[[c1]]<-c(members[[c1]],members[[c2]])
-        n1=members[c1].n;
-        n2=members[c2].n;
-        cap1=members[c1].capacity;
-        cap2=members[c2].capacity;
+        n1=clusterSize[clusterId[c1]];
+        n2=clusterSize[clusterId[c2]];
         DBG(2,"  members: n1=%d, n2=%d\n",n1,n2);
-        if (cap1>=n1+n2 || cap2>=n1+n2) {
-            // reuse of one of members[c1] members[c2]
-            if (cap1>=cap2) {
-                // copy members[c2] at the end of members[c1]
-                for (i=0;i<n2;i++) {
-                    members[c1].data[n1+i]=members[c2].data[i];
-                }
-                members[c1].n+=n2;
-                MEM_FREE(members[c2].data);
-                members[c2].data=NULL;
-            } else {
-                // copy members[c1] at the end of members[c2]
-                for (i=0;i<n1;i++) {
-                    members[c2].data[n2+i]=members[c1].data[i];
-                }
-                members[c2].n+=n1;
-                MEM_FREE(members[c1].data);
-                members[c1]=members[c2];
-                members[c2].data=NULL;
-            }
-        } else {
-            // allocate a new buffer for members[c1]
-            Num *newData=(Num *)MEM_ALLOC(2*(n1+n2),sizeof(Num));
-            for (i=0;i<n1;i++) {
-                newData[i]=members[c1].data[i];
-            }
-            for (i=0;i<n2;i++) {
-                newData[n1+i]=members[c2].data[i];
-            }
-            MEM_FREE(members[c1].data);
-            MEM_FREE(members[c2].data);
-            members[c1].n=n1+n2;
-            members[c1].data=newData;
-            members[c2].data=NULL;
+        ASSERT(n1>0,"invalid n1");
+        ASSERT(n2>0,"invalid n2");
+        DBG(5,"  membersPoolPos: %lu\n",membersPoolPos);
+        Num *newMembers=membersPool+membersPoolPos;
+        membersPoolPos+=n1+n2;
+        DBG(5,"  copying members of cluster1\n");
+        for (i=0;i<n1;i++) {
+            newMembers[i]=members[c1][i];
         }
+        DBG(5,"  copying members of cluster2\n");
+        for (i=0;i<n2;i++) {
+            newMembers[n1+i]=members[c2][i];
+        }
+        DBG(5,"  updating members\n");
+        members[c1]=newMembers;
         //R: members<-members[-c2]
-        //R: for (i=c2;i<clusterCount-1;i++) members[i]=members[i+1];
         memmove(members+c2,members+c2+1,sizeof(*members)*(clusterCount-1-c2));
+        DBG(5,"  members updated\n");
         //R: invcov<-invcov[-c2]
         memmove(invcov+p*p*c2,invcov+p*p*(c2+1),sizeof(*invcov)*p*p*(clusterCount-1-c2));
         //R: invcov[[c1]]<-invcov_merged
@@ -1117,18 +1175,20 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
          *   n*(i-1) - (i*(i-1+2))/2 + j
          *   n*(i-1) - (i*(i-1))/2 + j-i
          */
-        for (i=0;i<c1;i++) distXIndices[i]=R2C(C2R(i)*(2*clusterCount-(C2R(i)+1))/2-clusterCount+C2R(c2));
-        distXIndices[c1]=R2C(C2R(c1)*(2*clusterCount-(C2R(c1)+1))/2-clusterCount+C2R(c2));
-        for (i=c1+1;i<c2;i++) distXIndices[i]=R2C(C2R(i)*(2*clusterCount-(C2R(i)+1))/2-clusterCount+C2R(c2));
-        for (i=c2+1;i<clusterCount;i++) distXIndices[i-1]=R2C(C2R(c2)*(2*clusterCount-(C2R(c2)+1))/2-clusterCount+C2R(i));
+        DBG(5,"  updating distX\n");
+        // note the use of '2l' below not to let the 'int*int' overflow
+        for (i=0;i<c1;i++) distXIndices[i]=R2C(C2R(i)*(2l*clusterCount-(C2R(i)+1))/2-clusterCount+C2R(c2));
+        distXIndices[c1]=R2C(C2R(c1)*(2l*clusterCount-(C2R(c1)+1))/2-clusterCount+C2R(c2));
+        for (i=c1+1;i<c2;i++) distXIndices[i]=R2C(C2R(i)*(2l*clusterCount-(C2R(i)+1))/2-clusterCount+C2R(c2));
+        for (i=c2+1;i<clusterCount;i++) distXIndices[i-1]=R2C(C2R(c2)*(2l*clusterCount-(C2R(c2)+1))/2-clusterCount+C2R(i));
         distXIndicesLen=clusterCount-1;
         DBG_CODE(4,{
             DBGU("c1=%d, c2=%d, clusterCount=%d\n",c1,c2,clusterCount);
-            printNumMatrix("distXIndices part 1 (... c1)",distXIndices,1,c1);
-            printNumMatrix("distXIndices part 2 (c1)",distXIndices+c1,1,1);
-            printNumMatrix("distXIndices part 3 (c1 ... c2)",distXIndices+c1+1,1,c2-c1-1);
-            printNumMatrix("distXIndices part 4 (c2 ...)",distXIndices+c2,1,clusterCount-c2-1);
-            printNumMatrix("distXIndices",distXIndices,1,distXIndicesLen);
+            printLongNumMatrix("distXIndices part 1 (... c1)",distXIndices,1,c1);
+            printLongNumMatrix("distXIndices part 2 (c1)",distXIndices+c1,1,1);
+            printLongNumMatrix("distXIndices part 3 (c1 ... c2)",distXIndices+c1+1,1,c2-c1-1);
+            printLongNumMatrix("distXIndices part 4 (c2 ...)",distXIndices+c2,1,clusterCount-c2-1);
+            printLongNumMatrix("distXIndices",distXIndices,1,distXIndicesLen);
             DBG_CODE(4,printDistMatrix("distX pre update",distX,clusterCount,maxDistX));
         });
         /*
@@ -1178,35 +1238,35 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 count=distXLen-distXIndices[ii]-1;
             }
             if (ii+1<distXIndicesLen) {
-                DBG(4," distXIndices[i=%d]=%d, distXIndices[ii=%d]=%d, distXIndices[ii+1=%d]=%d\n",
+                DBG(4," distXIndices[i=%ld]=%ld, distXIndices[ii=%ld]=%ld, distXIndices[ii+1=%ld]=%ld\n",
                     i,distXIndices[i],ii,distXIndices[ii],ii+1,distXIndices[ii+1]);
             } else {
-                DBG(4," distXIndices[i=%d]=%d, distXIndices[ii=%d]=%d\n",i,distXIndices[i],ii,distXIndices[ii]);
+                DBG(4," distXIndices[i=%ld]=%ld, distXIndices[ii=%ld]=%ld\n",i,distXIndices[i],ii,distXIndices[ii]);
             }
             DBG_CODE(5,{
                 for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
-                printDoubleMatrix("distX pre move",distXTmp,1,(clusterCount-1)*(clusterCount-2)/2);
+                printDoubleMatrix("distX pre move",distXTmp,1,((long)clusterCount-1)*(clusterCount-2)/2);
             });
-            DBG(4,"memmove target %d (%p, value %g), source %d (%p, value %g), len %d (%d)\n",
+            DBG(4,"memmove target %ld (%p, value %g), source %ld (%p, value %g), len %ld (%ld)\n",
                 target,distX+target,maxDistX-distX[target],source,distX+source,maxDistX-distX[source],count,sizeof(*distX)*count);
             memmove(distX+target,distX+source,sizeof(*distX)*count);
-            DBG(5,"target %d (%p, value %g)\n",target,distX+target,maxDistX-distX[target]);
+            DBG(5,"target %ld (%p, value %g)\n",target,distX+target,maxDistX-distX[target]);
             DBG_CODE(5,{
                 for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
-                printDoubleMatrix("distX post move",distXTmp,1,(clusterCount-1)*(clusterCount-2)/2);
+                printDoubleMatrix("distX post move",distXTmp,1,((long)clusterCount-1)*(clusterCount-2)/2);
             });
             target+=count;
             i=ii+1;
         }
         distXLen-=clusterCount-1;
         DBG_CODE(3,{
-            DBGU("clusterCount %d\n",clusterCount);
-            DBGU("distXLen %d\n",distXLen);
+            DBGU("clusterCount: %d\n",clusterCount);
+            DBGU("distXLen: %d\n",distXLen);
             for (i=0;i<distXLen;i++) distXTmp[i]=maxDistX-distX[i];
-            printDoubleMatrix("distX",distXTmp,1,(clusterCount-1)*(clusterCount-2)/2);
+            printDoubleMatrix("distX",distXTmp,1,((long)clusterCount-1)*(clusterCount-2)/2);
         });
         DBG_CODE(3,printDistMatrix("distX",distX,clusterCount-1,maxDistX));
-
+        DBG(5,"  distX updated\n");
         // update clusterCount, clusterSize, clusterId
         clusterCount--;
         clusterSize[n+s]=clusterSize[clusterId[c1]]+clusterSize[clusterId[c2]];
@@ -1226,8 +1286,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
             for (i1=0;i1<clusterCount-1;i1++) {
 
-                Num xc1n=constructRepresentantsOfCluster(x,n,p,centroid,members,
-                                                         i1,xc1,quick,dbg);
+                Num xc1n=constructRepresentantsOfCluster(x,n,p,centroid,i1,
+                                                         members[i1],clusterSize[clusterId[i1]],
+                                                         xc1,quick,dbg);
                 DBG_CODE(3,printDoubleMatrix("xc1Orig",xc1,xc1n,p));
 
                 memcpy(ic2,invcov+i1*p*p,sizeof(*invcov)*p*p);
@@ -1259,15 +1320,15 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         DBG_CODE(3,printDoubleMatrix("normalized ic1",ic1,p,p));
                     }
                     distMaha1=computeMahalanobisDistance(y,xc1n,p,ic1,distMahaBuf,dbg);
-                    DBG(2,"distMaha1 %g\n",distMaha1);
+                    DBG(2,"distMaha1: %g\n",distMaha1);
 
                     // compute the distance from cluster (i2) to (i1)
                     yn=constructBetweenClusterDistanceMatrix(x,n,p,centroid,clusterCount,
-                                                             members,i2,i1,y,
+                                                             i2,i1,members[i2],clusterSize[clusterId[i2]],y,
                                                              quick,dbg);
                     DBG_CODE(3,printDoubleMatrix("xc2",y,yn,p));
                     distMaha2=computeMahalanobisDistance(y,yn,p,ic2,distMahaBuf,dbg);
-                    DBG(2,"distMaha2 %g\n",distMaha2);
+                    DBG(2,"distMaha2: %g\n",distMaha2);
 
                     // merge the clusterId(i1) <-> clusterId(i2) distances
                     tmp=distX[idx]=maxDistX-(distMaha1+distMaha2)/2;
@@ -1287,17 +1348,21 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG(4,"new maxDistX %f\n",maxDistX);
                 DBG(4,"new distX[0] %f\n",distX[0]);
             }
-		}
+        }
 
         R_CheckUserInterrupt();
-	}
+    }
 
-	DBG(2,"mhclust_ cleaning\n");
+    DBG(2,"mhclust_ cleaning\n");
 
     MEM_FREE(distXTmp);
     MEM_FREE(strBuf);
+    MEM_FREE(strBufShort);
+    MEM_FREE(strBufShort2);
     MEM_FREE(covMeansTmp);
     MEM_FREE(clusterSize);
+    MEM_FREE(membersPool);
+    MEM_FREE(members);
     MEM_FREE(clusterId);
     MEM_FREE(xij);
     MEM_FREE(covXij);
@@ -1309,10 +1374,6 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     MEM_FREE(distXIndices);
     MEM_FREE(y);
     MEM_FREE(distMahaBuf);
-    for (i=0;i<n;i++) {
-        deallocateNumList(members[i]);
-    }
-    MEM_FREE(members);
     MEM_FREE(invcov);
     MEM_FREE(invcovMerged);
     MEM_FREE(detsSqrt);
@@ -1321,10 +1382,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     MEM_FREE(xc2);
     MEM_FREE(weightFactor);
 
-	UNPROTECT(nprot);
+    UNPROTECT(nprot);
 
-	DBG(2,"mhclust_ finishes\n");
+    DBG(2,"mhclust_ finishes\n");
 
-	//return(NEW_LIST(0));
     return(R_NilValue);
 }
