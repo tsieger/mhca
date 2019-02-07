@@ -1105,11 +1105,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG_CODE(4,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
 
                 //R: ic2<-invcov[[otherClusters[ii]]]
-                offset=p*p*otherCluster;
-                for (i=0;i<p*p;i++) {
-                    // ic2[i]=invcov[p*p*otherCluster+i];
-                    ic2[i]=invcov[offset+i];
-                }
+                memcpy(ic2,invcov+p*p*otherCluster,p*p*sizeof(*ic2));
 
                 DBG_CODE(4,printDoubleMatrix("ic2",ic2,p,p));
 
