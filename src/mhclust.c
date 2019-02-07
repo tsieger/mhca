@@ -257,29 +257,38 @@ void printLongNumMatrix(const char *name,const LongNum *x,MatrixIndex rows,Matri
  *   covMeansTmp - temporary storage for means of x
  */
 double *cov(double *x, Num r, Num c, double *res,double *covMeansTmp) {
-    Num i,i1,i2,j;
+    Num i,i1,i2,j,offset,offset1,offset2,offset3,offset4;
     double *means=covMeansTmp;
-    for (i=0;i<c;i++) {
+    for (offset=i=0;i<c;i++) {
         double sum=0.0;
         for (j=0;j<r;j++) {
-            sum+=x[j+i*r];
+            // sum+=x[j+i*r];
+            sum+=x[j+offset];
         }
         means[i]=sum/r;
+        offset+=r;
     }
-    for (i1=0;i1<c;i1++) {
-        for (i2=0;i2<c;i2++) {
+    for (offset1=offset3=i1=0;i1<c;i1++) {
+        for (offset2=offset4=i2=0;i2<c;i2++) {
             if (i2>=i1) {
                 /* computing lower diagonal */
                 double sum=0.0;
                 for (j=0;j<r;j++) {
-                    sum+=(x[j+i1*r]-means[i1])*(x[j+i2*r]-means[i2]);
+                    // sum+=(x[j+i1*r]-means[i1])*(x[j+i2*r]-means[i2]);
+                    sum+=(x[j+offset1]-means[i1])*(x[j+offset2]-means[i2]);
                 }
-                res[i1+i2*c]=sum/(r-1);
+                // res[i1+i2*c]=sum/(r-1);
+                res[i1+offset4]=sum/(r-1);
             } else {
                 /* computing upper diagonal from lower diagonal */
-                res[i1+i2*c]=res[i2+i1*c];
+                // res[i1+i2*c]=res[i2+i1*c];
+                res[i1+offset4]=res[i2+offset3];
             }
+            offset2+=r;
+            offset4+=c;
         }
+        offset1+=r;
+        offset3+=c;
     }
     return res;
 }
@@ -310,11 +319,11 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,i
      *       const double *a, const int *lda,const double *b, const int *ldb,const double *beta,
      *       double *c, const int *ldc);
      * in general:
-     *    alpha*B * A + beta*C  ->  C
+     *    alpha*B * A + beta*C  ->  C, A symmetric
      * we use only:
      *    X    *    IC    ->   R
      * {n x p} * {p x p}    {n x p}
-     * i.e.
+     *
      * see http://www.math.utah.edu/software/lapack/lapack-blas/dsymm.html
      */
     double alpha=1.0;
@@ -333,9 +342,12 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,i
     // R: mean(sqrt(rowSums((X%*%IC)*X)))
     for (i=0;i<n;i++) { // TODO: optimize?
         double sum=0.0;
+        Num offset;
         // sum rows
-        for (j=0;j<p;j++) {
-            sum+=buf[i+n*j]*X[i+n*j];
+        for (offset=j=0;j<p;j++) {
+            // sum+=buf[i+n*j]*X[i+n*j];
+            sum+=buf[i+offset]*X[i+offset];
+            offset+=n;
         }
         // take the square root and store in the first column of "result"
         buf[i]=sqrt(sum);
@@ -371,19 +383,25 @@ Num constructRepresentantsOfCluster(double *x,Num n,Num p,double *centroid,
     Num i,j,yn;
 
     if (quickMode) {
+        Num offset;
         yn=1;
-        for (i=0;i<p;i++) {
-            y[i]=centroid[cluster+n*i];
+        for (offset=i=0;i<p;i++) {
+            // y[i]=centroid[cluster+n*i];
+            y[i]=centroid[cluster+offset];
+            offset+=n;
         }
     } else {
+        Num offset1,offset2;
         yn=memberCount;
-        for (i=0;i<p;i++) {
-            Num offset1=yn*i;
-            Num offset2=n*i;
+        for (offset1=offset2=i=0;i<p;i++) {
             Num cumI=0;
+            // offset1=yn*i;
+            // offset2=n*i;
             for (j=0;j<yn;j++,cumI++) {
                 y[cumI+offset1]=x[clusterMembers[j]+offset2];
             }
+            offset1+=yn;
+            offset2+=n;
         }
     }
     return(yn);
@@ -412,17 +430,19 @@ void constructBetweenClusterDistanceMatrixFromXi(double *Xi,Num n,Num p,
                                                  double *centroid,Num clusterCount,
                                                  Num clusterTo,double *y,
                                                  int quickMode,int dbg) {
-    Num i,j;
+    Num i,j,offset1,offset2;
 
     DBG_CODE(4,printDoubleMatrix("y",Xi,n,p));
     DBG_CODE(4,printDoubleMatrixRow("centroid[clusterTo]",centroid,clusterCount,p,clusterTo));
     //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-    for (i=0;i<p;i++) {
-        long offset1=n*i;
-        long offset2=clusterCount*i;
+    for (offset1=offset2=i=0;i<p;i++) {
+        // offset1=n*i;
+        // offset2=clusterCount*i;
         for (j=0;j<n;j++) {
             y[j+offset1]=Xi[j+offset1]-centroid[clusterTo+offset2];
         }
+        offset1+=n;
+        offset2+=clusterCount;
     }
     DBG_CODE(4,printDoubleMatrix("y-centroid",y,n,p));
 }
@@ -462,12 +482,15 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
     DBG_CODE(4,printDoubleMatrix("y",y,yn,p));
     DBG_CODE(4,printDoubleMatrixRow("centroid[clusterTo]",centroid,clusterCount,p,clusterTo));
     //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-    for (i=0;i<p;i++) {
-        long offset1=yn*i;
-        long offset2=clusterCount*i;
+    Num offset1,offset2;
+    for (offset1=offset2=i=0;i<p;i++) {
+        // offset1=yn*i;
+        // offset2=clusterCount*i;
         for (j=0;j<yn;j++) {
             y[j+offset1]-=centroid[clusterTo+offset2];
         }
+        offset1+=yn;
+        offset2+=clusterCount;
     }
     DBG_CODE(4,printDoubleMatrix("y-centroid",y,yn,p));
     return yn;
@@ -546,6 +569,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     Num c1,c2,s,i,j,k,oi;
     Num clusterSizeI,clusterSizeJ;
     Num c1n,c2n,*c1indices,*c2indices;
+    Num offset,offset1,offset2;
 
     Num fullMahalClusterCount; // number of clusters for which full Mahalanobis distance can be computed
     int switchedToFullMahal;
@@ -842,20 +866,24 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG(3,"constructing xij\n");
         //R: xij<-x[c(members[[c1]],members[[c2]]),,drop=FALSE]
         DBG_CODE(3,printNumMatrix("c1indices",c1indices,1,c1n));
-        for (i=0;i<p;i++) {
-            int offset1=xijN*i;
-            int offset2=n*i;
+        for (offset1=offset2=i=0;i<p;i++) {
+            // offset1=xijN*i;
+            // offset2=n*i;
             for (j=0;j<c1n;j++) {
                 xij[j+offset1]=x[c1indices[j]+offset2];
             }
+            offset1+=xijN;
+            offset2+=n;
         }
         DBG_CODE(3,printNumMatrix("c2indices",c2indices,1,c2n));
-        for (i=0;i<p;i++) {
-            int offset1=xijN*i;
-            int offset2=n*i;
+        for (offset1=offset2=i=0;i<p;i++) {
+            // offset1=xijN*i;
+            // offset2=n*i;
             for (j=0;j<c2n;j++) {
                 xij[c1n+j+offset1]=x[c2indices[j]+offset2];
             }
+            offset1+=xijN;
+            offset2+=n;
         }
         DBG_CODE(2,printDoubleMatrix("xij",xij,xijN,p));
 
@@ -909,8 +937,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             double *cholDecomp=covXij;
             //R: detSqrt<-(1/prod(diag(c.cholDecomp)))^(2/p)
             detSqrt=1.0;
-            for (i=0;i<p;i++) {
-                detSqrt*=cholDecomp[(p+1)*i];
+            for (offset=i=0;i<p;i++) {
+                // detSqrt*=cholDecomp[(p+1)*i];
+                detSqrt*=cholDecomp[offset];
+                offset+=p+1;
             }
             detSqrt=pow(detSqrt,-2.0/p);
             //R: invcov_merged<-chol2inv(c.cholDecomp)
@@ -919,15 +949,15 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             DBG(4,"info: %d\n",info);
             DBG_CODE(4,printDoubleMatrix("I",covXij,p,p));
             memcpy(invcovMerged,covXij,sizeof(*covXij)*p*p);
-            // invcovMerged contains only lower triangular part(plus diagonal),
+            // invcovMerged contains only lower triangular part (plus diagonal),
             // so initialize also the upper diagonal for debugging purposes
-            if (dbg) {
+            DBG_CODE(3,{
                 for (i=0;i<p;i++) {
                     for (j=i+1;j<p;j++) {
                         invcovMerged[i+p*j]=invcovMerged[j+p*i];
                     }
                 }
-            }
+            });
         } else {
             detSqrt=1.0;
             memcpy(invcovMerged,fakeInvCov,sizeof(*fakeInvCov)*p*p);
@@ -948,10 +978,11 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         });
         clusterSizeI=clusterSize[clusterId[c1]];
         clusterSizeJ=clusterSize[clusterId[c2]];
-        for (i=0;i<p;i++) {
-            long offset=clusterCount*i;
+        for (offset=i=0;i<p;i++) {
+            // offset=clusterCount*i;
             centroid[c1+offset]=(clusterSizeI*centroid[c1+offset] + clusterSizeJ*centroid[c2+offset])/
                 (clusterSizeI+clusterSizeJ);
+            offset+=clusterCount;
         }
         DBG_CODE(2,{
             sprintf(strBuf,"updated centroid[c1=%d]",C2R(c1));
@@ -998,22 +1029,26 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 if (quick) {
                     //R: xc1<-centroid[otherClusters[oi],,drop=FALSE]
                     xc1MemberCount=1;
-                    for (i=0;i<p;i++) {
-                        xc1[i]=centroid[otherCluster+clusterCount*i];
+                    for (offset=i=0;i<p;i++) {
+                        // xc1[i]=centroid[otherCluster+clusterCount*i];
+                        xc1[i]=centroid[otherCluster+offset];
+                        offset+=clusterCount;
                     }
                 } else {
                     //R: xc1<-x[members[[otherClusters[oi]]],,drop=FALSE]
                     xc1MemberCount=clusterSize[clusterId[otherCluster]];
                     DBG(3,"xc1MemberCount: %d\n",xc1MemberCount);
                     ASSERT(xc1MemberCount>0,"invalid xc1MemberCount");
-                    for (i=0;i<p;i++) {
-                        Num offset1=xc1MemberCount*i;
-                        Num offset2=n*i;
+                    for (offset1=offset2=i=0;i<p;i++) {
+                        // offset1=xc1MemberCount*i;
+                        // offset2=n*i;
                         Num cumI=0;
                         Num *mmbrs=members[otherCluster];
                         for (j=0;j<xc1MemberCount;j++,cumI++) {
                             xc1[cumI+offset1]=x[mmbrs[j]+offset2];
                         }
+                        offset1+=xc1MemberCount;
+                        offset2+=n;
                     }
                 }
                 DBG_CODE(4,{
@@ -1022,12 +1057,14 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
                 });
                 //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-                for (i=0;i<p;i++) {
-                    long offset1=xc1MemberCount*i;
-                    long offset2=clusterCount*i;
+                for (offset1=offset2=i=0;i<p;i++) {
+                    // offset1=xc1MemberCount*i;
+                    // offset2=clusterCount*i;
                     for (j=0;j<xc1MemberCount;j++) {
                         xc1[j+offset1]-=centroid[c1+offset2];
                     }
+                    offset1+=xc1MemberCount;
+                    offset2+=clusterCount;
                 }
                 DBG_CODE(4,printDoubleMatrix("centered xc1",xc1,xc1MemberCount,p));
                 // distMaha1 holds a vector of squares of mahalanobis distances:
@@ -1040,8 +1077,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 if (quick) {
                     //R: xc2<-centroid[c1,,drop=FALSE]
                     xc2MemberCount=1;
-                    for (i=0;i<p;i++) {
-                        xc2[i]=centroid[c1+clusterCount*i];
+                    for (offset=i=0;i<p;i++) {
+                        // xc2[i]=centroid[c1+clusterCount*i];
+                        xc2[i]=centroid[c1+offset];
+                        offset+=clusterCount;
                     }
                 } else {
                     xc2MemberCount=xijN;
@@ -1054,18 +1093,22 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 });
 
                 //R: xc2<-xc2-matrix(centroid[otherClusters[oi],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
-                for (i=0;i<p;i++) {
-                    long offset1=xc2MemberCount*i;
-                    long offset2=clusterCount*i;
+                for (offset1=offset2=i=0;i<p;i++) {
+                    // offset1=xc2MemberCount*i;
+                    // offset2=clusterCount*i;
                     for (j=0;j<xc2MemberCount;j++) {
                         xc2[j+offset1]-=centroid[otherCluster+offset2];
                     }
+                    offset1+=xc2MemberCount;
+                    offset2+=clusterCount;
                 }
                 DBG_CODE(4,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
 
                 //R: ic2<-invcov[[otherClusters[ii]]]
+                offset=p*p*otherCluster;
                 for (i=0;i<p*p;i++) {
-                    ic2[i]=invcov[p*p*otherCluster+i];
+                    // ic2[i]=invcov[p*p*otherCluster+i];
+                    ic2[i]=invcov[offset+i];
                 }
 
                 DBG_CODE(4,printDoubleMatrix("ic2",ic2,p,p));
