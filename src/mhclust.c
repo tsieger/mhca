@@ -1116,8 +1116,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 if (normalize || fullMahalClusterCount < clusterCount-1) {
                     DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                         normalize,fullMahalClusterCount,clusterCount);
+                    double detSqrt2=detsSqrt[otherCluster];
                     for (i=0;i<p*p;i++) {
-                        ic2[i]/=detsSqrt[otherCluster];
+                        ic2[i]/=detSqrt2;
                     }
                     DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
                 }
