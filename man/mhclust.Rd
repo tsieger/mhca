@@ -3,8 +3,8 @@
 \title{mhca}
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
-\usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, normalize = FALSE, 
-    verb = 0, useR = FALSE)}
+\usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
+    normalize = FALSE, verb = 0, useR = FALSE)}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -22,6 +22,15 @@ cluster shape as estimated by the covariance matrix of its members.}
   \item{quick}{boolean. If \code{TRUE}, inter-cluster
 distances will be computed using centroids only. If \code{FALSE},
 all observations contained in the clusters will be used.}
+  \item{g}{Optional assignment of samples to apriori clusters that
+should get formed (in a hierarchical fashion) before any other
+merging takes place. By default, there are no apriori clusters, and
+clustering starts from individual observations. If `g' is supplied,
+a numeric vector of length corresponding to the number of rows of
+`x' is expected, holding the index of apriori cluster each sample is
+member of. 0's can appear in the vector meaning that the
+corresponding sample is not member of any apriori cluster. See the
+`apriori' demo for an example.}
   \item{normalize}{boolean. If \code{TRUE}, cluster size
 will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the

@@ -520,7 +520,7 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
  *  Verb - level of verbosity, the greater the more detailed info,
  *      defaults to 0 (no info)
  */
-SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP Verb) {
+SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP Verb) {
     int dbg;
     int quick;
 
@@ -552,6 +552,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     double thresh;
     int normalize;
+
+    Num *g,gMergingCount;
 
     Num *clusterSize; // the size of clusters (indexed by clusterId: clusters 1..n are of size 1, then come merged clusters)
     Num *clusterId; // id of cluster contained in this specific position
@@ -610,6 +612,15 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     DBG(2,"normalize: %d\n",normalize);
     quick=*LOGICAL(Quick);
     DBG(2,"quick: %d\n",quick);
+    if (G==R_NilValue) {
+        g=NULL;
+    } else {
+        g=INTEGER(G);
+    }
+    DBG(2,"g: %p\n",g);
+    gMergingCount=*INTEGER(GMergingCount);
+    DBG(2,"gMergingCount: %d\n",gMergingCount);
+
     n=dimX[0]; // number of elementary points subject to clustering (merging)
     DBG(2,"n: %d\n",n);
     // check that the distance matrix can be indexed using a 'LongNum' index
@@ -990,9 +1001,16 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         });
         
         ///////////////////////////////////////////////////////////////
-        // update distX
+        // update distX if we haven't reached the point at which we switch
+        // to the full Mahalanobis style or if we haven't clustered all
+        // the samples in the apriori clusters (otherwise we recompute
+        // the whole distX later on)
         ///////////////////////////////////////////////////////////////
-        if (!(fullMahalClusterCount == clusterCount-1 && !switchedToFullMahal)) {
+        if (fullMahalClusterCount < clusterCount-1 || // we haven't reached the point of switch or
+            switchedToFullMahal || // we have already switched or
+            n-(clusterCount-1) < gMergingCount) { // we've not clustered all the samples in the apriori clusters
+            // ( n-(clusterCount-1) is the number of samples clustered so far)
+
             double minNewDistX=0,tmp;
 
             //R: ic1<-invcovMerged
@@ -1026,109 +1044,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 });
                 // compute the distance from the newly merged cluster c1+c2 to cluster otherClusters(oi)
 
-                if (quick) {
-                    //R: xc1<-centroid[otherClusters[oi],,drop=FALSE]
-                    xc1MemberCount=1;
-                    for (offset=i=0;i<p;i++) {
-                        // xc1[i]=centroid[otherCluster+clusterCount*i];
-                        xc1[i]=centroid[otherCluster+offset];
-                        offset+=clusterCount;
-                    }
-                } else {
-                    //R: xc1<-x[members[[otherClusters[oi]]],,drop=FALSE]
-                    xc1MemberCount=clusterSize[clusterId[otherCluster]];
-                    DBG(3,"xc1MemberCount: %d\n",xc1MemberCount);
-                    ASSERT(xc1MemberCount>0,"invalid xc1MemberCount");
-                    for (offset1=offset2=i=0;i<p;i++) {
-                        // offset1=xc1MemberCount*i;
-                        // offset2=n*i;
-                        Num cumI=0;
-                        Num *mmbrs=members[otherCluster];
-                        for (j=0;j<xc1MemberCount;j++,cumI++) {
-                            xc1[cumI+offset1]=x[mmbrs[j]+offset2];
-                        }
-                        offset1+=xc1MemberCount;
-                        offset2+=n;
-                    }
-                }
-                DBG_CODE(4,{
-                    printDoubleMatrix("xc1",xc1,xc1MemberCount,p);
-                    sprintf(strBuf,"centroid[c1=%d]:",C2R(c1));
-                    printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
-                });
-                //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-                for (offset1=offset2=i=0;i<p;i++) {
-                    // offset1=xc1MemberCount*i;
-                    // offset2=clusterCount*i;
-                    for (j=0;j<xc1MemberCount;j++) {
-                        xc1[j+offset1]-=centroid[c1+offset2];
-                    }
-                    offset1+=xc1MemberCount;
-                    offset2+=clusterCount;
-                }
-                DBG_CODE(4,printDoubleMatrix("centered xc1",xc1,xc1MemberCount,p));
-                // distMaha1 holds a vector of squares of mahalanobis distances:
-                // mean Mahalanobis distance from c1+c2 to some other cluster
-                //R: distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
-                distMaha1=computeMahalanobisDistance(xc1,xc1MemberCount,p,ic1,distMahaBuf,dbg);
-                DBG(3,"distMaha1 %g\n",distMaha1);
-
-                // compute the distance from cluster otherClusters(oi) to the newly merged cluster c1+c2
-                if (quick) {
-                    //R: xc2<-centroid[c1,,drop=FALSE]
-                    xc2MemberCount=1;
-                    for (offset=i=0;i<p;i++) {
-                        // xc2[i]=centroid[c1+clusterCount*i];
-                        xc2[i]=centroid[c1+offset];
-                        offset+=clusterCount;
-                    }
-                } else {
-                    xc2MemberCount=xijN;
-                    memcpy(xc2,xij,sizeof(*xij)*xijN*p);
-                }
-                DBG_CODE(4,{
-                    printDoubleMatrix("xc2",xc2,xc2MemberCount,p);
-                    sprintf(strBuf,"centroid[oi=%d]",C2R(otherCluster));
-                    printDoubleMatrixRow(strBuf,centroid,clusterCount,p,otherCluster);
-                });
-
-                //R: xc2<-xc2-matrix(centroid[otherClusters[oi],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
-                for (offset1=offset2=i=0;i<p;i++) {
-                    // offset1=xc2MemberCount*i;
-                    // offset2=clusterCount*i;
-                    for (j=0;j<xc2MemberCount;j++) {
-                        xc2[j+offset1]-=centroid[otherCluster+offset2];
-                    }
-                    offset1+=xc2MemberCount;
-                    offset2+=clusterCount;
-                }
-                DBG_CODE(4,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
-
-                //R: ic2<-invcov[[otherClusters[ii]]]
-                memcpy(ic2,invcov+p*p*otherCluster,p*p*sizeof(*ic2));
-
-                DBG_CODE(4,printDoubleMatrix("ic2",ic2,p,p));
-
-                if (normalize || fullMahalClusterCount < clusterCount-1) {
-                    DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
-                        normalize,fullMahalClusterCount,clusterCount);
-                    double detSqrt2=detsSqrt[otherCluster];
-                    for (i=0;i<p*p;i++) {
-                        ic2[i]/=detSqrt2;
-                    }
-                    DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
-                }
-
-                // mean Mahalanobis distance from otherCluster to c1+c2
-                //R: distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
-                distMaha2=computeMahalanobisDistance(xc2,xc2MemberCount,p,ic2,distMahaBuf,dbg);
-                DBG(3,"distMaha2: %g\n",distMaha2);
-
-                // merge the clusterId(c1) <-> clusterId(c2) distances
                 //R: iRelDistXIdx<-c(otherClusters1*(clusterCount-(otherClusters1+1)/2)-clusterCount+c1,
                 //R:     c1*(clusterCount-(c1+1)/2)-clusterCount+otherClusters2,
                 //R:     c1*(clusterCount-(c1+1)/2)-clusterCount+otherClusters3)
-                //R: distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
                 if (oi<c1) {
                     distXIdx=R2C(((long)C2R(otherCluster-1))*clusterCount-(((long)C2R(otherCluster))*(C2R(otherCluster)+1))/2+C2R(c1));
                     // note the '(long)x' above not to let the 'int*int' overflow
@@ -1141,8 +1059,122 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 }
                 DBG(4,"distXIdx: %ld\n",(long)distXIdx);
                 ASSERT(distXIdx>=0,"invalid distXIdx");
-                tmp=distX[distXIdx]=maxDistX-(distMaha1+distMaha2)/2;
-                if (tmp<minNewDistX) minNewDistX=tmp;
+
+                // if we are still clustering samples of the apriori clusters, the distance
+                // between clusters in disctinct apriori clusters arem by definition, se to Inf
+                //R: if (!is.null(g) && g[members[[i]][1]]!=g[members[[otherClusters[ii]]][1]] && # clusters in distinct apriori clusters
+                //R:    pointCount-(clusterCount-1) < gMergingCount) { # and we are not done with clustering the samples from prior clusters
+                //R:    distX[iRelDistXIdx[ii]]<-Inf
+                //R: }
+                if (G!=R_NilValue && g[*members[c1]]!=g[*members[otherCluster]] && // clusters in distinct apriori clusters
+                    n-(clusterCount-1) < gMergingCount) { // and we are not done with clustering the samples from prior clusters
+                    distX[distXIdx]=0; // set the value meaning Inf (as distX is inverted and we find the maximum absolute value,
+                    // 0 denote value that can't be found if there are still some unclustered samples)
+                } else {
+
+                    if (quick) {
+                        //R: xc1<-centroid[otherClusters[oi],,drop=FALSE]
+                        xc1MemberCount=1;
+                        for (offset=i=0;i<p;i++) {
+                            // xc1[i]=centroid[otherCluster+clusterCount*i];
+                            xc1[i]=centroid[otherCluster+offset];
+                            offset+=clusterCount;
+                        }
+                    } else {
+                        //R: xc1<-x[members[[otherClusters[oi]]],,drop=FALSE]
+                        xc1MemberCount=clusterSize[clusterId[otherCluster]];
+                        DBG(3,"xc1MemberCount: %d\n",xc1MemberCount);
+                        ASSERT(xc1MemberCount>0,"invalid xc1MemberCount");
+                        for (offset1=offset2=i=0;i<p;i++) {
+                            // offset1=xc1MemberCount*i;
+                            // offset2=n*i;
+                            Num cumI=0;
+                            Num *mmbrs=members[otherCluster];
+                            for (j=0;j<xc1MemberCount;j++,cumI++) {
+                                xc1[cumI+offset1]=x[mmbrs[j]+offset2];
+                            }
+                            offset1+=xc1MemberCount;
+                            offset2+=n;
+                        }
+                    }
+                    DBG_CODE(4,{
+                        printDoubleMatrix("xc1",xc1,xc1MemberCount,p);
+                        sprintf(strBuf,"centroid[c1=%d]:",C2R(c1));
+                        printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
+                    });
+                    //R: xc1<-xc1-matrix(centroid[c1,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
+                    for (offset1=offset2=i=0;i<p;i++) {
+                        // offset1=xc1MemberCount*i;
+                        // offset2=clusterCount*i;
+                        for (j=0;j<xc1MemberCount;j++) {
+                            xc1[j+offset1]-=centroid[c1+offset2];
+                        }
+                        offset1+=xc1MemberCount;
+                        offset2+=clusterCount;
+                    }
+                    DBG_CODE(4,printDoubleMatrix("centered xc1",xc1,xc1MemberCount,p));
+                    // distMaha1 holds a vector of squares of mahalanobis distances:
+                    // mean Mahalanobis distance from c1+c2 to some other cluster
+                    //R: distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
+                    distMaha1=computeMahalanobisDistance(xc1,xc1MemberCount,p,ic1,distMahaBuf,dbg);
+                    DBG(3,"distMaha1 %g\n",distMaha1);
+
+                    // compute the distance from cluster otherClusters(oi) to the newly merged cluster c1+c2
+                    if (quick) {
+                        //R: xc2<-centroid[c1,,drop=FALSE]
+                        xc2MemberCount=1;
+                        for (offset=i=0;i<p;i++) {
+                            // xc2[i]=centroid[c1+clusterCount*i];
+                            xc2[i]=centroid[c1+offset];
+                            offset+=clusterCount;
+                        }
+                    } else {
+                        xc2MemberCount=xijN;
+                        memcpy(xc2,xij,sizeof(*xij)*xijN*p);
+                    }
+                    DBG_CODE(4,{
+                        printDoubleMatrix("xc2",xc2,xc2MemberCount,p);
+                        sprintf(strBuf,"centroid[oi=%d]",C2R(otherCluster));
+                        printDoubleMatrixRow(strBuf,centroid,clusterCount,p,otherCluster);
+                    });
+
+                    //R: xc2<-xc2-matrix(centroid[otherClusters[oi],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
+                    for (offset1=offset2=i=0;i<p;i++) {
+                        // offset1=xc2MemberCount*i;
+                        // offset2=clusterCount*i;
+                        for (j=0;j<xc2MemberCount;j++) {
+                            xc2[j+offset1]-=centroid[otherCluster+offset2];
+                        }
+                        offset1+=xc2MemberCount;
+                        offset2+=clusterCount;
+                    }
+                    DBG_CODE(4,printDoubleMatrix("centered xc2",xc2,xc2MemberCount,p));
+
+                    //R: ic2<-invcov[[otherClusters[ii]]]
+                    memcpy(ic2,invcov+p*p*otherCluster,p*p*sizeof(*ic2));
+
+                    DBG_CODE(4,printDoubleMatrix("ic2",ic2,p,p));
+
+                    if (normalize || fullMahalClusterCount < clusterCount-1) {
+                        DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
+                            normalize,fullMahalClusterCount,clusterCount);
+                        double detSqrt2=detsSqrt[otherCluster];
+                        for (i=0;i<p*p;i++) {
+                            ic2[i]/=detSqrt2;
+                        }
+                        DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
+                    }
+
+                    // mean Mahalanobis distance from otherCluster to c1+c2
+                    //R: distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
+                    distMaha2=computeMahalanobisDistance(xc2,xc2MemberCount,p,ic2,distMahaBuf,dbg);
+                    DBG(3,"distMaha2: %g\n",distMaha2);
+
+                    // merge the clusterId(c1) <-> clusterId(c2) distances
+                    //R: distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
+                    tmp=distX[distXIdx]=maxDistX-(distMaha1+distMaha2)/2;
+                    if (tmp<minNewDistX) minNewDistX=tmp;
+                }
 
                 DBG(3,"otherCluster: %d\n",C2R(otherCluster));
                 //DBG("Dist from %d=(%s)\n",C2R(clusterId[otherCluster]),printMembers(members[otherCluster]));
@@ -1166,9 +1198,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             }
         }
 
-         // clusters clusterId[c1] and clusterId[c2] merged, remove
-         // clusterId[c2]-related info, put info about the newly created
-         // cluster at position occupied by clusterId[c1] previously
+        // clusters clusterId[c1] and clusterId[c2] merged, remove
+        // clusterId[c2]-related info, put info about the newly created
+        // cluster at position occupied by clusterId[c1] previously
         //DBG(2,"  updating...\n");
         //R: members[[c1]]<-c(members[[c1]],members[[c2]])
         n1=clusterSize[clusterId[c1]];
@@ -1316,7 +1348,11 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         memmove(clusterId+c2,clusterId+c2+1,sizeof(*clusterId)*(clusterCount-c2));
         DBG_CODE(4,printNumMatrix("clusterId",clusterId,1,clusterCount));
 
-        if (fullMahalClusterCount == clusterCount && !switchedToFullMahal) {
+        // recompute distX in case we reached the point at which we switch to the full Mahalanobis style
+        // and we've also clustered all the samples in the apriori clusters
+        if (fullMahalClusterCount == clusterCount && // we reached the switch point and
+            !switchedToFullMahal && // we haven't swicthed yet and
+            gMergingCount <= n-clusterCount) { // we have clustered all samples in the apriori clusters
             int idx,i1,i2;
             double tmp,minNewDistX=0;
 

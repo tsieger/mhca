@@ -58,6 +58,22 @@ normalize, ##<< boolean. If \code{TRUE}, cluster size
 ## cluster. If \code{FALSE}, once all clusters are of at least the
 ## \code{thresh} relative size, both cluster shape and size will
 ## affect inter-cluster distance.
+g, ##<< Optional assignment of samples to apriori clusters that
+## should get formed (in a hierarchical fashion) before any other
+## merging takes place. If NULL, there are no apriori clusters, and
+## clustering starts from individual observations. If `g' is not NULL,
+## a numeric vector of length corresponding to the number of rows of
+## `x' is expected, holding the index of apriori cluster each sample is
+## member of. 0's can appear in the vector meaning that the
+## corresponding sample is not member of any apriori cluster. See the
+## `aprioriMhca' demo for an example.
+gMergingCount, ##<< number of merging operations to be performed when
+## forming the apriori clusters (this is directly computed from `g' and
+## appears here only to eliminate code duplication).
+gDistIdx, ##<< indices into the distance matrix where entries holding
+## distances between members of the apriori clusters appear (this is
+## directly computed from `g' and appears here only to eliminate code
+## duplication).
 verb ##<< level of verbosity, the greater the more detailed
 ## info, defaults to 0 (no info).
 ) {
@@ -102,6 +118,9 @@ verb ##<< level of verbosity, the greater the more detailed
     if (dbg>1) printWithName(spaceDim)
     # compute distance matrix
     distX<-dist(x)
+    if (!is.null(gDistIdx)) {
+      distX[-gDistIdx]<-Inf
+    }
     # merging: the output of the clustering - the structure of clusters
     merging<-matrix(0,pointCount-1,3)
     # how may clusters (hot merged together yet) remain; in the
@@ -241,8 +260,13 @@ verb ##<< level of verbosity, the greater the more detailed
             (clusterSize[clusterId[i]] + clusterSize[clusterId[j]])
         if (dbg>1) printWithName(centroid[i,,drop=FALSE])
 
-        # update distX
-        if (!(fullMahalClusterCount == clusterCount-1 && !switchedToFullMahal)) {
+        # update distX if we haven't reached the point at which we switch to the full
+        # Mahalanobis style or if we haven't clustered all the samples in the apriori clusters
+        # (otherwise we recompute the whole distX later on)
+        if (fullMahalClusterCount < clusterCount-1 || # we haven't reached the point of switch or
+          switchedToFullMahal || # we have already switched or
+          pointCount-(clusterCount-1) < gMergingCount) { # we've not clustered all the samples in the apriori clusters
+          # ( pointCount-(clusterCount-1) is the number of samples clustered so far)
             ic1<-invcov_merged
             detSqrtIc1<-detSqrt
             if (dbg>2) printWithName(ic1)
@@ -254,45 +278,7 @@ verb ##<< level of verbosity, the greater the more detailed
             for (ii in seq(along=otherClusters)) {
                 if (dbg>2) printWithName(ii)
                 if (dbg>2) printWithName(otherClusters[ii])
-      
-                # compute the distance from the newly merged cluster i+j to cluster otherClusters(ii)
-                if (quick) {
-                    xc1<-centroid[otherClusters[ii],,drop=FALSE]
-                } else {
-                    xc1<-x[members[[otherClusters[ii]]],,drop=FALSE]
-                }
-                if (dbg>3) printWithName(xc1)
-                if (dbg>3) printWithName(centroid[i,,drop=FALSE])
-                xc1<-xc1-matrix(centroid[i,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
-                if (dbg>3) printWithName(xc1)
-                # distMaha1 holds a vector of squares of mahalanobis distances:
-                # mean Mahalanobis distance from i+j to some other cluster
-                distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
-                if (dbg>2) printWithName(distMaha1)
 
-                # compute the distance from cluster otherClusters(ii) to the newly merged cluster i+j
-                if (quick) {
-                    xc2<-centroid[i,,drop=FALSE]
-                } else {
-                    xc2<-xij
-                }
-                if (dbg>3) printWithName(xc2)
-                if (dbg>3) printWithName(centroid[otherClusters[ii],,drop=FALSE])
-                xc2<-xc2-matrix(centroid[otherClusters[ii],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
-                if (dbg>3) printWithName(xc2)
-                #if (dbg>3) printWithName(centroid[otherClusters[ii],])
-                #if (dbg>3) printWithName(invcov[[otherClusters[ii]]])
-                ic2<-invcov[[otherClusters[ii]]]
-                if (dbg>3) printWithName(ic2)
-                if (normalize || fullMahalClusterCount < clusterCount-1) {
-                    ic2<-ic2 / detsSqrt[otherClusters[ii]]
-                    if (dbg>3) printWithName(ic2)
-                }
-                # mean Mahalanobis distance
-                distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
-                if (dbg>2) printWithName(distMaha2)
-
-                # merge the clusterId(i) <-> clusterId(j) distances
                 iRelDistXIdx<-c(otherClusters1*(clusterCount-(otherClusters1+1)/2)-clusterCount+i,
                     i*(clusterCount-(i+1)/2)-clusterCount+otherClusters2,
                     i*(clusterCount-(i+1)/2)-clusterCount+otherClusters3)
@@ -301,7 +287,54 @@ verb ##<< level of verbosity, the greater the more detailed
                     printWithName(ii)
                     printWithName(iRelDistXIdx[ii])
                 }
-                distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
+
+                # if we are still clustering samples of the apriori clusters, the distance
+                # between clusters in disctinct apriori clusters arem by definition, se to Inf
+                if (!is.null(g) && g[members[[i]][1]]!=g[members[[otherClusters[ii]]][1]] && # clusters in distinct apriori clusters
+                     pointCount-(clusterCount-1) < gMergingCount) { # and we are not done with clustering the samples from prior clusters
+                    # the distance between clusters in different apriori clusters is defined to be Inf
+                    distX[iRelDistXIdx[ii]]<-Inf
+                } else {
+                    # compute the distance from the newly merged cluster i+j to cluster otherClusters(ii)
+                    if (quick) {
+                        xc1<-centroid[otherClusters[ii],,drop=FALSE]
+                    } else {
+                        xc1<-x[members[[otherClusters[ii]]],,drop=FALSE]
+                    }
+                    if (dbg>3) printWithName(xc1)
+                    if (dbg>3) printWithName(centroid[i,,drop=FALSE])
+                    xc1<-xc1-matrix(centroid[i,,drop=FALSE],nrow(xc1),ncol(xc1),byrow=TRUE)
+                    if (dbg>3) printWithName(xc1)
+                    # distMaha1 holds a vector of squares of mahalanobis distances:
+                    # mean Mahalanobis distance from i+j to some other cluster
+                    distMaha1<-mean(sqrt(rowSums((xc1%*%ic1)*xc1)))
+                    if (dbg>2) printWithName(distMaha1)
+
+                    # compute the distance from cluster otherClusters(ii) to the newly merged cluster i+j
+                    if (quick) {
+                        xc2<-centroid[i,,drop=FALSE]
+                    } else {
+                        xc2<-xij
+                    }
+                    if (dbg>3) printWithName(xc2)
+                    if (dbg>3) printWithName(centroid[otherClusters[ii],,drop=FALSE])
+                    xc2<-xc2-matrix(centroid[otherClusters[ii],,drop=FALSE],nrow(xc2),ncol(xc2),byrow=TRUE)
+                    if (dbg>3) printWithName(xc2)
+                    #if (dbg>3) printWithName(centroid[otherClusters[ii],])
+                    #if (dbg>3) printWithName(invcov[[otherClusters[ii]]])
+                    ic2<-invcov[[otherClusters[ii]]]
+                    if (dbg>3) printWithName(ic2)
+                    if (normalize || fullMahalClusterCount < clusterCount-1) {
+                        ic2<-ic2 / detsSqrt[otherClusters[ii]]
+                        if (dbg>3) printWithName(ic2)
+                    }
+                    # mean Mahalanobis distance
+                    distMaha2<-mean(sqrt(rowSums((xc2%*%ic2)*xc2)))
+                    if (dbg>2) printWithName(distMaha2)
+
+                    # merge the clusterId(i) <-> clusterId(j) distances
+                    distX[iRelDistXIdx[ii]]<-mean(c(distMaha1,distMaha2))
+                }
                 if (dbg>2) cat(sprintf('Dist from %d=%s to %d=%s: %g.\n',clusterId[otherClusters[ii]],printClusterMembers(members[[otherClusters[ii]]]),
                   s+pointCount,printClusterMembers(c(members[[i]], members[[j]])),distX[iRelDistXIdx[ii]]))
             }
@@ -328,8 +361,12 @@ verb ##<< level of verbosity, the greater the more detailed
         clusterSize[pointCount+s]<-clusterSize[clusterId[i]] + clusterSize[clusterId[j]]
         clusterId[i]<-pointCount+s
         clusterId<-clusterId[-j]
-      
-        if (fullMahalClusterCount == clusterCount && !switchedToFullMahal) {
+
+        # recompute distX in case we reached the point at which we switch to the full Mahalanobis style
+        # and we've also clustered all the samples in the apriori clusters
+        if (fullMahalClusterCount == clusterCount && # we reached the switch point and
+          !switchedToFullMahal && # we haven't swicthed yet and
+          gMergingCount <= pointCount-clusterCount) { # we have clustered all samples in the apriori clusters
             switchedToFullMahal<-TRUE
             if (dbg>1) cat('Recomputing all distances.\n')
             idx<-1
@@ -352,7 +389,6 @@ verb ##<< level of verbosity, the greater the more detailed
                 for (i2 in mySeq(i1+1,clusterCount)) {
                     if (dbg>1) cat(paste0('recomputing dist from ',i1,' to ',i2,'\n'))
 
-      
                     # compute the distance from cluster (i1) to (i2)
                     xc1<-xc1Orig-matrix(centroid[i2,,drop=FALSE],nrow(xc1Orig),ncol(xc1Orig),byrow=TRUE)
                     if (dbg>2) printWithName(xc1)
