@@ -83,7 +83,8 @@ useR = FALSE ##<< if TRUE, R implementation gets used, otherwise, C
         # convert factor to numeric
         if (!is.numeric(g)) stop('g must be numeric')
         g<-as.integer(g)
-        if (min(g)<0 || max(g)>n) stop('g must consist of indices of apriori clusters in the range of 1 to n')
+        if (length(g)!=n) stop('g must be a vector of ',n,' elements')
+        if (min(g)<0 || max(g)>n) stop('g must consist of indices of apriori clusters in the range of 1 to ',n)
         # compute the cardinality of each member of g
         gt<-table(g)
         if (verb>1) printWithName(gt)
