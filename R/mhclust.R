@@ -104,9 +104,11 @@ useR = FALSE ##<< if TRUE, R implementation gets used, otherwise, C
         gDistIdxCnt<-0
         for (gti in 1:length(gt)) {
             i<-which(g==gtLevels[gti])
-            tmp<-getDistGroupIdx(n,i)
-            gDistIdx[gDistIdxCnt+(1:length(tmp))]<-tmp
-            gDistIdxCnt<-gDistIdxCnt+length(tmp)
+            if (length(i)>1) {
+                tmp<-getDistGroupIdx(n,i)
+                gDistIdx[gDistIdxCnt+(1:length(tmp))]<-tmp
+                gDistIdxCnt<-gDistIdxCnt+length(tmp)
+            }
         }
         gDistIdx<-gDistIdx[1:gDistIdxCnt]
     } else {
