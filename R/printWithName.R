@@ -21,8 +21,9 @@ printWithName<-function (x,dec.digits=4) {
                 }
                 cat('\n')
             }
-        }
-        else {
+        } else if (is.table(x)) {
+          print(x)
+        } else {
           cat('    ')
           print.single(x)
           cat('\n')
