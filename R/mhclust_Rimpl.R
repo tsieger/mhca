@@ -423,7 +423,7 @@ verb ##<< level of verbosity, the greater the more detailed
         }
     }
 
-    return(list(merge=merging[,1:2],height=merging[,3]))
+    return(list(merge=merging[,1:2,drop=FALSE],height=merging[,3]))
     ### An object of class *hclust*. The object is a list with
     ### components:
     ###
