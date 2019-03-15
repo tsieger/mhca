@@ -85,9 +85,18 @@ useR = FALSE ##<< if TRUE, R implementation gets used, otherwise, C
         g<-as.integer(g)
         if (length(g)!=n) stop('g must be a vector of ',n,' elements')
         if (min(g)<0 || max(g)>n) stop('g must consist of indices of apriori clusters in the range of 1 to ',n)
-        # compute the cardinality of each member of g
-        gt<-table(g)
+        # compute the cardinality of each non zero member of g
+        gt<-table(g[g>0])
         if (verb>1) printWithName(gt)
+        # check for pathological cases
+        if (length(gt)==0 || # no non zero entries in g
+            gt[1]==n || # a single apriori cluster of all observations
+            all(gt==1)) { # each and every single observation forms an apriori cluster
+            g<-NULL
+        }
+    }
+    if (!is.null(g)) {
+        # there are some non-trivial apriori clusters
         gMergingCount<-sum(gt[gt>1]-1)
         gtLevels<-as.numeric(names(gt))
         # indices into the distance matrix where pairs of points g reside
@@ -95,17 +104,9 @@ useR = FALSE ##<< if TRUE, R implementation gets used, otherwise, C
         gDistIdxCnt<-0
         for (gti in 1:length(gt)) {
             i<-which(g==gtLevels[gti])
-            if (length(i)==n) {
-                # there is only one huge apriori cluster - no need to do anything special
-                g<-NULL
-            } else if (length(i)>1) {
-                tmp<-getDistGroupIdx(n,i)
-                gDistIdx[gDistIdxCnt+(1:length(tmp))]<-tmp
-                gDistIdxCnt<-gDistIdxCnt+length(tmp)
-            } else {
-                # set the apriori cluster to 0 for apriori clusters of only 1 sample
-                g[i]<-0
-            }
+            tmp<-getDistGroupIdx(n,i)
+            gDistIdx[gDistIdxCnt+(1:length(tmp))]<-tmp
+            gDistIdxCnt<-gDistIdxCnt+length(tmp)
         }
         gDistIdx<-gDistIdx[1:gDistIdxCnt]
     } else {
