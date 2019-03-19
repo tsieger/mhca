@@ -555,7 +555,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     Num *g,gMergingCount;
 
-    Num *clusterSize; // the size of clusters (indexed by clusterId: clusters 1..n are of size 1, then come merged clusters)
+    Num *clusterSize; // the size of clusters
     Num *clusterId; // id of cluster contained in this specific position
     double detSqrt;
     double* detsSqrt; // square root of determinants of inverse covariance matrices
@@ -667,9 +667,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     // cluster exists
     clusterCount=n;
     // number of elementary points in each cluster
-    clusterSize=(int *)MEM_ALLOC(2*clusterCount-1,sizeof(int));
+    clusterSize=(int *)MEM_ALLOC(clusterCount,sizeof(int));
     for (i=0;i<clusterCount;i++) clusterSize[i]=1;
-    for (i=0;i<clusterCount-1;i++) clusterSize[clusterCount+i]=0;
     // members (elementary observations) of each cluster
     // To store the cluster members during the clustering, there is at
     // most the cummulative need for
@@ -766,7 +765,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG_CODE(3, {
             DBGU("\n====================== step %d ============================\n",s);
             for (i=0;i<clusterCount;i++) {
-                DBGU("members[%d]: %s\n",C2R(i),getMembers(members[i],clusterSize[clusterId[i]],strBuf));
+                DBGU("members[%d]: %s\n",C2R(i),getMembers(members[i],clusterSize[i],strBuf));
             }
             for (i=0;i<clusterCount;i++) {
                 DBGU("invcov[%d]: \n",i);
@@ -786,8 +785,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             for (i=0;i<clusterCount;i++) {
                 DBGU("clusterId[%d]: %d\n",C2R(i),C2R(clusterId[i]));
             }
-            //printNumMatrix("clusterSize",clusterSize,1,2*n-1);
-            for (i=0;i<2*n-1;i++) {
+            //printNumMatrix("clusterSize",clusterSize,1,clusterCount);
+            for (i=0;i<clusterCount;i++) {
                 DBGU("clusterSize[%d]: %d\n",C2R(i),clusterSize[i]);
             }
             DBGU("fullMahalClusterCount=%d\n",fullMahalClusterCount);
@@ -844,8 +843,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         ASSERT(c2>=0,"invalid c2");
         //R: if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',s+n,v,clusterId[c1],clusterId[c2],printMembers(members[[c1]]),printMembers(members[[c2]])))
         DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),
-            getMembers(members[c1],clusterSize[clusterId[c1]],strBuf),
-            getMembers(members[c2],clusterSize[clusterId[c2]],strBufShort));
+            getMembers(members[c1],clusterSize[c1],strBuf),
+            getMembers(members[c2],clusterSize[c2],strBufShort));
         //R: merging[s,1:3]<-c(clusterId[i],clusterId[c2],v);
         merging[s]=C2R(clusterId[c1]);
         merging[s+(n-1)]=C2R(clusterId[c2]);
@@ -866,8 +865,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
         // get all samples constituting the merged clusters
         //R: xij<-x[c(members[[c1]],members[[c2]]),,drop=FALSE]
-        c1n=clusterSize[clusterId[c1]];
-        c2n=clusterSize[clusterId[c2]];
+        c1n=clusterSize[c1];
+        c2n=clusterSize[c2];
         DBG(2,"c1n=%d, c2n=%d\n",c1n,c2n);
         ASSERT(c1n>0,"invalid c1n");
         ASSERT(c2n>0,"invalid c2n");
@@ -903,14 +902,14 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         // the merged cluster)
         if (thresh > 0) {
             DBG_CODE(2,{
-                DBGU("clusterSize[clusterId[c1]] %d\n",clusterSize[clusterId[c1]]);
-                DBGU("clusterSize[clusterId[c2]] %d\n",clusterSize[clusterId[c2]]);
-                DBGU("(clusterSize[clusterId[c1]] + clusterSize[clusterId[c2]]) / ( n * thresh ) %.3f\n",
-                     (clusterSize[clusterId[c1]] + clusterSize[clusterId[c2]]) / ( n * thresh ));
+                DBGU("clusterSize[c1] %d\n",clusterSize[c1]);
+                DBGU("clusterSize[c2] %d\n",clusterSize[c2]);
+                DBGU("(clusterSize[c1] + clusterSize[c2]) / ( n * thresh ) %.3f\n",
+                     (clusterSize[c1] + clusterSize[c2]) / ( n * thresh ));
                 DBGU("n %d\n",n);
                 DBGU("thresh %.3f\n",thresh );
             });
-            wf1=fmin2(1.0, (clusterSize[clusterId[c1]] + clusterSize[clusterId[c2]]) / ( n * thresh ) );
+            wf1=fmin2(1.0, (clusterSize[c1] + clusterSize[c2]) / ( n * thresh ) );
         } else {
             wf1=0;
         }
@@ -979,16 +978,16 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             printDoubleMatrix("invcovMerged",invcovMerged,p,p);
         });
         // compute a new center of the merged cluster
-        //R: centroid[c1,]<-(clusterSize[clusterId[c1]]*centroid[c1,,drop=FALSE] + clusterSize[clusterId[c2]]*centroid[c2,,drop=FALSE])/
-        //R:      (clusterSize[clusterId[c1]] + clusterSize[clusterId[c2]]) */
+        //R: centroid[c1,]<-(clusterSize[c1]*centroid[c1,,drop=FALSE] + clusterSize[c2]*centroid[c2,,drop=FALSE])/
+        //R:      (clusterSize[c1] + clusterSize[c2]) */
         DBG_CODE(2,{
             sprintf(strBuf,"centroid[c1=%d]",C2R(c1));
             printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c1);
             sprintf(strBuf,"centroid[c2=%d]",C2R(c2));
             printDoubleMatrixRow(strBuf,centroid,clusterCount,p,c2);
         });
-        clusterSizeI=clusterSize[clusterId[c1]];
-        clusterSizeJ=clusterSize[clusterId[c2]];
+        clusterSizeI=clusterSize[c1];
+        clusterSizeJ=clusterSize[c2];
         for (offset=i=0;i<p;i++) {
             // offset=clusterCount*i;
             centroid[c1+offset]=(clusterSizeI*centroid[c1+offset] + clusterSizeJ*centroid[c2+offset])/
@@ -1039,7 +1038,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     printDoubleMatrix("normalized ic1",ic1,p,p);
                     for (ii=0;ii<clusterCount;ii++) {
                         DBGU("MEMBERS[%d]: ",ii);
-                        DBGU("%s\n",getMembers(members[ii],clusterSize[clusterId[ii]],strBuf));
+                        DBGU("%s\n",getMembers(members[ii],clusterSize[ii],strBuf));
                     }
                 });
                 // compute the distance from the newly merged cluster c1+c2 to cluster otherClusters(oi)
@@ -1082,7 +1081,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         }
                     } else {
                         //R: xc1<-x[members[[otherClusters[oi]]],,drop=FALSE]
-                        xc1MemberCount=clusterSize[clusterId[otherCluster]];
+                        xc1MemberCount=clusterSize[otherCluster];
                         DBG(3,"xc1MemberCount: %d\n",xc1MemberCount);
                         ASSERT(xc1MemberCount>0,"invalid xc1MemberCount");
                         for (offset1=offset2=i=0;i<p;i++) {
@@ -1179,10 +1178,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG(3,"otherCluster: %d\n",C2R(otherCluster));
                 //DBG("Dist from %d=(%s)\n",C2R(clusterId[otherCluster]),printMembers(members[otherCluster]));
                 DBG(3,"Dist from %d=(%s) to %d=(%s %s): %g.\n",
-                    C2R(clusterId[otherCluster]),getMembers(members[otherCluster],clusterSize[clusterId[otherCluster]],strBuf),
+                    C2R(clusterId[otherCluster]),getMembers(members[otherCluster],clusterSize[otherCluster],strBuf),
                     C2R(s+n),
-                    getMembers(members[c1],clusterSize[clusterId[c1]],strBufShort),
-                    getMembers(members[c2],clusterSize[clusterId[c2]],strBufShort2),
+                    getMembers(members[c1],clusterSize[c1],strBufShort),
+                    getMembers(members[c2],clusterSize[c2],strBufShort2),
                     maxDistX-distX[distXIdx]);
             }
             // move distX values if some distance was below 0 (in that case
@@ -1203,8 +1202,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         // cluster at position occupied by clusterId[c1] previously
         //DBG(2,"  updating...\n");
         //R: members[[c1]]<-c(members[[c1]],members[[c2]])
-        n1=clusterSize[clusterId[c1]];
-        n2=clusterSize[clusterId[c2]];
+        n1=clusterSize[c1];
+        n2=clusterSize[c2];
         DBG(2,"  members: n1=%d, n2=%d\n",n1,n2);
         ASSERT(n1>0,"invalid n1");
         ASSERT(n2>0,"invalid n2");
@@ -1342,7 +1341,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG(5,"  distX updated\n");
         // update clusterCount, clusterSize, clusterId
         clusterCount--;
-        clusterSize[n+s]=clusterSize[clusterId[c1]]+clusterSize[clusterId[c2]];
+        clusterSize[c1]=clusterSize[c1]+clusterSize[c2];
+        //R: clusterSize<-clusterSize[-c2]
+        memmove(clusterSize+c2,clusterSize+c2+1,sizeof(*clusterSize)*(clusterCount-c2));
+        DBG_CODE(4,printNumMatrix("clusterSize",clusterSize,1,clusterCount));
         clusterId[c1]=n+s;
         //R: clusterId<-clusterId[-c2]
         memmove(clusterId+c2,clusterId+c2+1,sizeof(*clusterId)*(clusterCount-c2));
@@ -1364,7 +1366,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             for (i1=0;i1<clusterCount-1;i1++) {
 
                 Num xc1n=constructRepresentantsOfCluster(x,n,p,centroid,i1,
-                                                         members[i1],clusterSize[clusterId[i1]],
+                                                         members[i1],clusterSize[i1],
                                                          xc1,quick,dbg);
                 DBG_CODE(3,printDoubleMatrix("xc1Orig",xc1,xc1n,p));
 
@@ -1401,7 +1403,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
                     // compute the distance from cluster (i2) to (i1)
                     yn=constructBetweenClusterDistanceMatrix(x,n,p,centroid,clusterCount,
-                                                             i2,i1,members[i2],clusterSize[clusterId[i2]],y,
+                                                             i2,i1,members[i2],clusterSize[i2],y,
                                                              quick,dbg);
                     DBG_CODE(3,printDoubleMatrix("xc2",y,yn,p));
                     distMaha2=computeMahalanobisDistance(y,yn,p,ic2,distMahaBuf,dbg);

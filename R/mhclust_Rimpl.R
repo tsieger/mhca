@@ -128,7 +128,7 @@ verb ##<< level of verbosity, the greater the more detailed
     # cluster exists
     clusterCount<-pointCount
     # number of elementary points in each cluster
-    clusterSize<-c(rep(1,clusterCount),rep(0,clusterCount-1))
+    clusterSize<-rep(1,clusterCount)
     # clusters being made (by merging two smaller clusters) are
     # assigned unique IDs, but reside in data structured indexed by
     # index of one of its subclusters - thus we need to map the
@@ -226,7 +226,7 @@ verb ##<< level of verbosity, the greater the more detailed
         # balance (to be applied when measuring distances relatively to
         # the merged cluster)
         if (thresh > 0) {
-            wf1<-min( 1, (clusterSize[clusterId[i]] + clusterSize[clusterId[j]]) / ( pointCount * thresh ) )
+            wf1<-min( 1, (clusterSize[i] + clusterSize[j]) / ( pointCount * thresh ) )
         } else {
             wf1<-0
         }
@@ -256,8 +256,8 @@ verb ##<< level of verbosity, the greater the more detailed
 
         if (dbg>2) printWithName(invcov_merged)
         # compute a new center of the merged cluster
-        centroid[i,]<-(clusterSize[clusterId[i]]*centroid[i,,drop=FALSE] + clusterSize[clusterId[j]]*centroid[j,,drop=FALSE])/
-            (clusterSize[clusterId[i]] + clusterSize[clusterId[j]])
+        centroid[i,]<-(clusterSize[i]*centroid[i,,drop=FALSE] + clusterSize[j]*centroid[j,,drop=FALSE])/
+            (clusterSize[i] + clusterSize[j])
         if (dbg>1) printWithName(centroid[i,,drop=FALSE])
 
         # update distX if we haven't reached the point at which we switch to the full
@@ -358,7 +358,8 @@ verb ##<< level of verbosity, the greater the more detailed
 
         # update clusterCount, clusterSize, clusterId
         clusterCount<-clusterCount-1
-        clusterSize[pointCount+s]<-clusterSize[clusterId[i]] + clusterSize[clusterId[j]]
+        clusterSize[i]<-clusterSize[i]+clusterSize[j]
+        clusterSize<-clusterSize[-j]
         clusterId[i]<-pointCount+s
         clusterId<-clusterId[-j]
 
