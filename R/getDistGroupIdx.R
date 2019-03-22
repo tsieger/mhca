@@ -8,7 +8,8 @@ idx ##<< indices of observations whose corresponding indices into the
 ## distance matrix are to be computed
 ) {
     if (!is.numeric(idx)) stop('group idx must be numeric')
-    if (any(idx<1 || idx>n)) stop('group idx must consist of observation indices in the range of 1 to n')
+    if (any(idx<1 | idx>n)) stop('group idx must consist of observation indices in the range of 1 to n')
+
     m<-length(idx)
     if (m<=1) {
         res<-c()
