@@ -4,7 +4,8 @@
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
 \usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    normalize = FALSE, verb = 0, useR = FALSE)}
+    gRecursive = TRUE, normalize = FALSE, verb = 0, verbRecursive = verb, 
+    useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -31,6 +32,14 @@ a numeric vector of length corresponding to the number of rows of
 member of. 0's can appear in the vector meaning that the
 corresponding sample is not member of any apriori cluster. See the
 `apriori' demo for an example.}
+  \item{gRecursive}{boolean. If \code{TRUE}, clustering of the
+apriori clusters is performed in a recursive manner in space
+`O(m^2)', where `m' is the apriori cluster size, and the apriori
+clusters get clustered subsequently, in space `O(g^2)', where `g' is
+the number of apriori clusters. If \code{FALSE}, the clustering of
+the apriori clusters is performed as part of the whole clustering,
+so that it requires `O(n^2)' space, where `n' is the number of all
+observations. The best (and the default) option is thus \code{TRUE}.}
   \item{normalize}{boolean. If \code{TRUE}, cluster size
 will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the
@@ -38,8 +47,17 @@ cluster. If \code{FALSE}, once all clusters are of at least the
 affect inter-cluster distance.}
   \item{verb}{level of verbosity, the greater the more detailed
 info, defaults to 0 (no info).}
+  \item{verbRecursive}{level of verbosity of the recursive calls}
   \item{useR}{if TRUE, R implementation gets used, otherwise, C
-implementation gets used}
+implementation gets used. It is not guarranteed that these two
+implementations yield exactly same results for the same input data
+when the inter-cluster distances are not unique. This is due to
+technical differences (the finding of the minimum inter-cluster
+distance differs between C and R).}
+  \item{nFull}{number of observations; this equals
+the number of rows of \code{x} on primary call, but on recursive
+calls over a subset of \code{x} it refers to the original full
+data set (internal parameter)}
 }
 \details{This is 'mahalanobis-average' hierarchical clustering similar to
 `hclust' with advanced merging strategy. The shape of clusters is

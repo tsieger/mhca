@@ -9,7 +9,7 @@ void R_init_mhca(DllInfo *info) {
 
     // Therefore, we must go the more complex way:
     static const R_CallMethodDef callMethods[]  = {
-        {"mhclust_", (DL_FUNC) &mhclust_,10},
+        {"mhclust_", (DL_FUNC) &mhclust_,20},
         {NULL, NULL, 0}
     };
     R_registerRoutines(info,NULL,callMethods,NULL,NULL);

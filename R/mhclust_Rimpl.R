@@ -74,19 +74,88 @@ gDistIdx, ##<< indices into the distance matrix where entries holding
 ## distances between members of the apriori clusters appear (this is
 ## directly computed from `g' and appears here only to eliminate code
 ## duplication).
-verb ##<< level of verbosity, the greater the more detailed
+verb, ##<< level of verbosity, the greater the more detailed
 ## info, defaults to 0 (no info).
+.nFull = NULL, ##<< number of observations; this equals
+## the number of rows of \code{x} on primary call, but it refers to
+## the original full data set on recursive calls over a subset of
+## \code{x} (this is an internal parameter)
+.nLeft = NULL, ##<< number of clusters and observations left for
+## clustering after apriori clusters have been processed (internal
+## parameter used when clustering pre-clustered apriori clusters)
+## parameter)
+.distX = NULL, ##<< distance matrix (internal parameter used when
+## clustering pre-clustered apriori clusters)
+.centroid = NULL, ##<< centroid of current clusters/observations to
+## cluster (internal parameter used when clustering pre-clustered
+## apriori clusters)
+.members = NULL, ##<< members of the current clusters/observations to
+## cluster (internal parameter used when clustering pre-clustered
+## apriori clusters)
+.invcov = NULL, ##<< inverse of the covariance matrices of the current
+## clusters/observations to cluster (internal parameter used when
+## clustering pre-clustered apriori clusters)
+.detsSqrt = NULL, ##<< normalization constants of the inverse of the
+## covariance matrices (internal parameter used when clustering
+## pre-clustered apriori clusters)
+.weightFactor = NULL, ##<< weight factors of the current
+## clusters/observations (internal parameter used when clustering
+## pre-clustered apriori clusters)
+.clusterId = NULL, ##<< IDs of the current clusters/observations
+## (internal parameter used when clustering pre-clustered apriori
+## clusters)
+.clusterSize, ##<< the size of the current clusters/observations
+## (internal parameter used when clustering pre-clustered apriori
+## clusters)
+.merging = NULL, ##<< the `merge' matrix representing the clustering of
+## the apriori clusters (internal parameter used when clustering
+## pre-clustered apriori clusters)
+.height = NULL ##<< the `height' vector representing the clustering of
+## the apriori clusters (internal parameter used when clustering
+## pre-clustered apriori clusters)
 ) {
 
-    # Sequence generation resembling matlab ':' operator.
-    # The difference from R `seq' is the behaviour in case when
-    # from=2, to=1 and b=1 - in that case R seq raises an error, while
-    # matlab returns an empty sequence.
-    # This function returns an empty sequence as well in this case.
-    mySeq <- function(from,to,by=1) {
-        if ((from<to) == (by>0)) return(seq(from,to,by))
-        else if (from==to) return(from)
-        else return(vector(class(from),0))
+    if (verb>2) {
+        printWithName(.nFull)
+    }
+    # sanity check: the optional '.*' arguments starting from '.nLeft' should all be present or all be NULL
+    tmp<-c(
+        is.null(.nLeft),
+        is.null(.distX),
+        is.null(.centroid),
+        is.null(.members),
+        is.null(.invcov),
+        is.null(.detsSqrt),
+        is.null(.weightFactor),
+        is.null(.clusterId),
+        is.null(.clusterSize),
+        is.null(.merging),
+        is.null(.height))
+    if (verb>1) printWithName(tmp)
+    if (!is.null(.nLeft)) {
+        if (verb>2) {
+            printWithName(.nLeft)
+            printWithName(.centroid)
+            printWithName(.members)
+            printWithName(.invcov)
+            printWithName(.detsSqrt)
+            printWithName(.weightFactor)
+            printWithName(.clusterId)
+            printWithName(.clusterSize)
+            printWithName(.merging)
+            printWithName(.height)
+        }
+        # check the consistency of the .* arguments
+        stopifnot(all(tmp) || all(!tmp))
+        stopifnot(.nLeft==nrow(.centroid))
+        stopifnot(.nLeft==length(.members))
+        stopifnot(.nLeft==length(.invcov))
+        stopifnot(.nLeft==length(.detsSqrt))
+        stopifnot(.nLeft==length(.weightFactor))
+        stopifnot(.nLeft==length(.clusterId))
+        stopifnot(.nLeft==length(.clusterSize))
+        stopifnot(nrow(x)-.nLeft==nrow(.merging))
+        stopifnot(nrow(x)-.nLeft==length(.height))
     }
 
     printClusterMembers<-function (m,addParentheses=TRUE) {
@@ -112,61 +181,109 @@ verb ##<< level of verbosity, the greater the more detailed
 
     # number of elementary points subject to clustering (merging)
     pointCount<-nrow(x)
+    # number of points in the full (original) data set; on recursive calls over a subset of data
+    # pointCount refers to the subset, while fullPointCount refers to the original data
+    if (!is.null(.nFull)) {
+        fullPointCount<-.nFull
+    } else {
+        fullPointCount<-pointCount
+    }
     if (dbg>1) printWithName(pointCount)
+    if (dbg>1) printWithName(fullPointCount)
     # number of dimensions of the feature space
     spaceDim<-ncol(x)
     if (dbg>1) printWithName(spaceDim)
-    # compute distance matrix
-    distX<-dist(x)
+    if (!is.null(.distX)) {
+        distX<-.distX
+    } else {
+        # compute distance matrix
+        distX<-dist(x)
+    }
     if (!is.null(gDistIdx)) {
       distX[-gDistIdx]<-Inf
     }
     # merging: the output of the clustering - the structure of clusters
     merging<-matrix(0,pointCount-1,3)
-    # how may clusters (hot merged together yet) remain; in the
+    if (!is.null(.merging) && !is.null(.height)) {
+        merging[1:(pointCount-.nLeft),1:2]<-.merging
+        merging[1:(pointCount-.nLeft),3]<-.height
+    }
+    # how may clusters (not merged together yet) remain; in the
     # beginning, all points are clusters, in the end only one huge
     # cluster exists
-    clusterCount<-pointCount
+    if (!is.null(.nLeft)) {
+        clusterCount<-.nLeft
+    } else {
+        clusterCount<-pointCount
+    }
     # number of elementary points in each cluster
-    clusterSize<-rep(1,clusterCount)
+    if (!is.null(.clusterSize)) {
+        clusterSize<-.clusterSize
+    } else {
+        clusterSize<-rep(1,clusterCount)
+    }
     # clusters being made (by merging two smaller clusters) are
     # assigned unique IDs, but reside in data structured indexed by
     # index of one of its subclusters - thus we need to map the
-    # 1:pointCount space into IDs of current clusters
-    clusterId<-1:pointCount
+    # 1:clusterCount space into IDs of current clusters
+    if (!is.null(.clusterId)) {
+        clusterId<-.clusterId
+    } else {
+        clusterId<-1:clusterCount
+    }
 
     # if inverse of covariance matrix can't be computed, use
     # this surrogate
     fakeInvCov<-diag(spaceDim)
 
     # members (elementary observations) of each cluster
-    members<-vector('list',clusterCount)
-    members[1:clusterCount]<-1:clusterCount
+    if (!is.null(.members)) {
+        members<-.members
+    } else {
+        members<-vector('list',clusterCount)
+        members[1:clusterCount]<-1:clusterCount
+    }
     # inverse of covariance matrix of members of given cluster
     # (representing the shape of the clusters)
-    invcov<-rep(list(fakeInvCov),clusterCount)
+    if (!is.null(.invcov)) {
+        invcov<-.invcov
+    } else {
+        invcov<-rep(list(fakeInvCov),clusterCount)
+    }
     # normalizing factor for each cluster (computed from determinant of
     # the inverse of the covariance matrix) making the N-dim volume of
     # clusters equal to 1 if `invcov[[i]]' gets divided by `detsSqrt[i]'
-    detsSqrt<-rep(1,clusterCount)
+    if (!is.null(.detsSqrt)) {
+        detsSqrt<-.detsSqrt
+    } else {
+        detsSqrt<-rep(1,clusterCount)
+    }
     # centroids of cluster
-    centroid<-x
+    if (!is.null(.centroid)) {
+        centroid<-.centroid
+    } else {
+        centroid<-x
+    }
     # proportional size of each cluster
-    weightFactor<-rep(0,clusterCount)
+    if (!is.null(.weightFactor)) {
+        weightFactor<-.weightFactor
+    } else {
+        weightFactor<-rep(0,clusterCount)
+    }
     # number of clusters whose relative size is at least
     # thresh
-    fullMahalClusterCount<-0
+    fullMahalClusterCount<-sum(clusterSize>=thresh*fullPointCount)
     # have all clusters reached the thresh
     # relative size and have we, therefore, switched into "full
-    #Mahalanobis" mode?
-    switchedToFullMahal<-FALSE
+    # Mahalanobis" mode?
+    switchedToFullMahal<-fullMahalClusterCount==clusterCount
 
     if (dbg>1) printWithName(thresh)
     if (dbg>1) printWithName(normalize)
     if (dbg>1) printWithName(quick)
 
     # merge two closest clusters at each step `s'
-    for (s in mySeq(1,pointCount-1)) {
+    for (s in mySeq(pointCount-clusterCount+1,pointCount-1)) {
         if (dbg>2) {
             cat(sprintf('\n====================== step %d ============================\n',s-1))
             printMembers(members)
@@ -226,7 +343,7 @@ verb ##<< level of verbosity, the greater the more detailed
         # balance (to be applied when measuring distances relatively to
         # the merged cluster)
         if (thresh > 0) {
-            wf1<-min( 1, (clusterSize[i] + clusterSize[j]) / ( pointCount * thresh ) )
+            wf1<-min( 1, (clusterSize[i] + clusterSize[j]) / ( fullPointCount * thresh ) )
         } else {
             wf1<-0
         }

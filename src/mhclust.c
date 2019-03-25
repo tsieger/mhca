@@ -36,6 +36,9 @@
 # define ASSERT(cnd,msg)
 #endif
 
+// check for NULL arguments
+#define IS_R_NULL(x) (x==R_NilValue)
+
 // convert C 0-based indices to R 1-based indices
 #define C2R(n) (n+1)
 // convert R 1-based indices to C 1-based indices
@@ -519,8 +522,13 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
  *       the cluster shape and size will affect inter-cluster distance.
  *  Verb - level of verbosity, the greater the more detailed info,
  *      defaults to 0 (no info)
+ * _NFull, _NLeft, _Centroid, _Members, _Invcov, _DetsSqrt,
+ * _WeightFactor, _ClusterId, _Height are internal parameters used when
+ *      clustering pre-clustered apriori clusters)
  */
-SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP Verb) {
+SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP Verb,
+              SEXP _NFull,SEXP _NLeft,SEXP _Centroid,SEXP _Members,SEXP _Invcov,SEXP _DetsSqrt,SEXP _WeightFactor,
+              SEXP _ClusterId,SEXP _ClusterSize,SEXP _MembersPoolSize) {
     int dbg;
     int quick;
 
@@ -529,6 +537,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     double *x; // input data
     Num *dimX;
     Num n,n1,n2; // number of data points
+    Num nFull; // number of total data points (it equals n on primary
+    // call, but it is greater than n on recursive calls)
     Num clusterCount; // number of clusters (=n-1)
     Num p; // dimensionality of x
     double *centroid; // centroids of clusters
@@ -565,6 +575,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     Num **members;
     Num *membersPool;
     unsigned long membersPoolPos;
+    unsigned long membersPoolSize;
 
     Num *otherClusters;
     Num *otherClustersTmp;
@@ -597,6 +608,48 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
      * dbg = 5: debug infos
      */
 
+    Num _nFull;
+    if (!IS_R_NULL(_NFull)) {
+        _nFull=*INTEGER(_NFull);
+    } else {
+        _nFull=0;
+    }
+
+    // sanity check: the optional '_*' arguments starting from '_nLeft' should all be present or all be NULL
+    int tmp[]={
+        IS_R_NULL(_NLeft),
+        IS_R_NULL(_Centroid),
+        IS_R_NULL(_Members),
+        IS_R_NULL(_Invcov),
+        IS_R_NULL(_DetsSqrt),
+        IS_R_NULL(_WeightFactor),
+        IS_R_NULL(_ClusterId),
+        IS_R_NULL(_ClusterSize),
+        IS_R_NULL(_MembersPoolSize),
+        -1};
+    int allOptPresent=1,allOptMissing=1;
+    for (i=0;tmp[i]!=-1;i++) {
+        if (tmp[i]) allOptPresent=0;
+        if (!tmp[i]) allOptMissing=1;
+    }
+    ASSERT(allOptPresent || allOptMissing,"invalid internal parameters");
+    Num _nLeft=0L;
+    double *_centroid=NULL;
+    double *_detsSqrt=NULL;
+    double *_weightFactor=NULL;
+    Num *_clusterId=NULL;
+    Num *_clusterSize=NULL;
+    long _membersPoolSize=0L;
+    if (allOptPresent) {
+        _nLeft=*INTEGER(_NLeft);
+        _centroid=REAL(_Centroid);
+        _detsSqrt=REAL(_DetsSqrt);
+        _weightFactor=REAL(_WeightFactor);
+        _clusterId=INTEGER(_ClusterId);
+        _clusterSize=INTEGER(_ClusterSize);
+        _membersPoolSize=*INTEGER(_MembersPoolSize);
+    }
+
     dimX=INTEGER(GET_DIM(X));
     PROTECT(X=AS_NUMERIC(X)); nprot++;
     PROTECT(DistX=AS_NUMERIC(DistX)); nprot++;
@@ -612,7 +665,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     DBG(2,"normalize: %d\n",normalize);
     quick=*LOGICAL(Quick);
     DBG(2,"quick: %d\n",quick);
-    if (G==R_NilValue) {
+    if (IS_R_NULL(G)) {
         g=NULL;
     } else {
         g=INTEGER(G);
@@ -623,6 +676,17 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     n=dimX[0]; // number of elementary points subject to clustering (merging)
     DBG(2,"n: %d\n",n);
+
+    // how may clusters (hot merged together yet) remain; in the
+    // beginning, all points are clusters, in the end only one huge
+    // cluster exists
+    if (!IS_R_NULL(_NLeft)) {
+        clusterCount=_nLeft;
+    } else {
+        clusterCount=n;
+    }
+    DBG(2,"clusterCount: %d\n",clusterCount);
+
     // check that the distance matrix can be indexed using a 'LongNum' index
     DBG(3,"n*(n-1)/2: %ld\n",((long)n)*(n-1)/2);
     DBG(3,"max representable length: %ld\n",(1l<<(sizeof(LongNum)*8-1))-1);
@@ -642,10 +706,18 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     strBufShort2=MEM_ALLOC(20*n,sizeof(char));
 #endif
     DBG(2,"length of distX: %ld\n",(long)distXLen);
-    DBG(3,"expected distX len: %ld\n",((long)n)*(n-1)/2); // note the '(long)x' not to let the 'int*int' overflow
-    if (distXLen!=((long)n)*(n-1)/2) error("invalid distXLen");
+    DBG(3,"expected distX len: %ld\n",((long)clusterCount)*(clusterCount-1)/2); // note the '(long)x' not to let the 'int*int' overflow
+    if (distXLen!=((long)clusterCount)*(clusterCount-1)/2) error("invalid distXLen");
     p=dimX[1]; // number of dimensions of the feature space
     DBG(2,"p: %d\n",p);
+
+    if (!IS_R_NULL(_NFull)) {
+        nFull=_nFull;
+    } else {
+        nFull=n;
+    }
+    DBG(2,"nFull: %d\n",nFull);
+
     covMeansTmp=(double *)MEM_ALLOC(p,sizeof(double));
     DBG_CODE(3,printDoubleMatrix("x",x,n,p));
     covXijLength=p*p;
@@ -662,36 +734,58 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     for (i=0;i<distXLen;i++) distX[i]=maxDistX-distX[i];
     DBG_CODE(4,printDoubleMatrix("distX (tx'd)",distX,1,distXLen));
 
-    // how may clusters (hot merged together yet) remain; in the
-    // beginning, all points are clusters, in the end only one huge
-    // cluster exists
-    clusterCount=n;
     // number of elementary points in each cluster
     clusterSize=(int *)MEM_ALLOC(clusterCount,sizeof(int));
-    for (i=0;i<clusterCount;i++) clusterSize[i]=1;
-    // members (elementary observations) of each cluster
-    // To store the cluster members during the clustering, there is at
-    // most the cummulative need for
-    // `1 + 1 + ... + 1 + 2 + 3 + ... + n = n+(n-1)*(n+2)/2' members.
-    // (The first `n' `1s' stand for individual observations, then the
-    // worst scenario is a single growing cluster accumulating a single
-    // observation on each step.) This is a worst-case quadratic space,
-    // while the optimal case would take only `O(n*log2(n))' space.
-    membersPool=(Num*)MEM_ALLOC(n+((long)n-1)*(n+2)/2,sizeof(Num));
-    // note the '(long)x' above not to let the 'int*int' overflow
-    membersPoolPos=0;
-    members=(Num**)MEM_ALLOC(n,sizeof(Num*));
-    for (i=0;i<n;i++) {
-        members[i]=membersPool+membersPoolPos++;
-        *members[i]=i;
+    if (!IS_R_NULL(_ClusterSize)) {
+        for (i=0;i<clusterCount;i++) clusterSize[i]=_clusterSize[i];
+    } else {
+        for (i=0;i<clusterCount;i++) clusterSize[i]=1;
+    }
+    members=(Num**)MEM_ALLOC(clusterCount,sizeof(Num*));
+    if (!IS_R_NULL(_Members)) {
+        membersPoolSize=_membersPoolSize;
+        membersPool=(Num*)MEM_ALLOC(membersPoolSize,sizeof(Num));
+        DBG(3,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
+        membersPoolPos=0;
+        for (i=0;i<clusterCount;i++) {
+            members[i]=membersPool+membersPoolPos;
+            membersPoolPos+=clusterSize[i];
+            ASSERT(membersPoolPos<=membersPoolSize,"membersPool exhausted");
+            Num *tmp=INTEGER(VECTOR_ELT(_Members,i));
+            for (j=0;j<clusterSize[i];j++) {
+                members[i][j]=R2C(tmp[j]);
+            }
+        }
+    } else {
+        // To store the cluster members during the clustering, there is at
+        // most the cummulative need for
+        // `1 + 1 + ... + 1 + 2 + 3 + ... + n = n+(n-1)*(n+2)/2' members.
+        // (The first `n' `1s' stand for individual observations, then the
+        // worst scenario is a single growing cluster accumulating a single
+        // observation on each step.) This is a worst-case quadratic space,
+        // while the optimal case would take only `O(n*log2(n))' space.
+        membersPoolSize=clusterCount+((long)clusterCount-1)*(clusterCount+2)/2;
+        membersPool=(Num*)MEM_ALLOC(membersPoolSize,sizeof(Num));
+        DBG(3,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
+        membersPoolPos=0;
+        // create new lists of members
+        for (i=0;i<clusterCount;i++) {
+            members[i]=membersPool+membersPoolPos++;
+            ASSERT(membersPoolPos<=membersPoolSize,"membersPool exhausted");
+            *members[i]=i;
+        }
     }
 
     // clusters being made (by merging two smaller clusters) are
     // assigned unique IDs, but reside in data structured indexed by
     // index of one of its subclusters - thus we need to map the
-    // 1:n space into IDs of current clusters
-    clusterId=(int *)MEM_ALLOC(n,sizeof(int));
-    for (i=0;i<n;i++) clusterId[i]=i;
+    // 1:clusterCount space into IDs of current clusters
+    clusterId=(int *)MEM_ALLOC(clusterCount,sizeof(int));
+    if (!IS_R_NULL(_ClusterId)) {
+        for (i=0;i<clusterCount;i++) clusterId[i]=R2C(_clusterId[i]);
+    } else {
+        for (i=0;i<clusterCount;i++) clusterId[i]=i;
+    }
 
     xij=(double *)MEM_ALLOC(n*p,sizeof(double));
     covXij=(double *)MEM_ALLOC(covXijLength,sizeof(double));
@@ -720,10 +814,16 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     //R: invcov<-rep(list(fakeInvCov),clusterCount)
     invcov=(double *)MEM_ALLOC(clusterCount*p*p,sizeof(double));
     invcovMerged=(double *)MEM_ALLOC(clusterCount*p*p,sizeof(double));
-    memset(invcov,0,clusterCount*p*p*sizeof(double));
-    for (i=0;i<n;i++) {
-        for (j=0;j<p;j++) {
-            invcov[p*p*i+(p+1)*j]=1;
+    if (!IS_R_NULL(_Invcov)) {
+        for (i=0;i<clusterCount;i++) {
+            memcpy(invcov+p*p*i,REAL(VECTOR_ELT(_Invcov,i)),p*p*sizeof(double));
+        }
+    } else {
+        memset(invcov,0,clusterCount*p*p*sizeof(double));
+        for (i=0;i<clusterCount;i++) {
+            for (j=0;j<p;j++) {
+                invcov[p*p*i+(p+1)*j]=1;
+            }
         }
     }
     // invcov holds inverses of covariance matrices, stored one after another
@@ -732,32 +832,51 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     // the inverse of the covariance matrix) making the N-dim volume of
     // clusters equal to 1 if `invcov[[i]]' gets divided by `detsSqrt[i]'.
     detsSqrt=(double*)MEM_ALLOC(clusterCount,sizeof(double));
-    for (i=0;i<clusterCount;i++) detsSqrt[i]=1.0;
+    if (!IS_R_NULL(_DetsSqrt)) {
+        for (i=0;i<clusterCount;i++) detsSqrt[i]=_detsSqrt[i];
+    } else {
+        for (i=0;i<clusterCount;i++) detsSqrt[i]=1.0;
+    }
 
     // centroids of clusters
     //R: centroid<-x
     centroid=(double *)MEM_ALLOC(n*p,sizeof(double));
-    memcpy(centroid,x,sizeof(*x)*n*p);
-    DBG_CODE(3,printDoubleMatrix("centroid",centroid,n,p));
+    if (!IS_R_NULL(_Centroid)) {
+        memcpy(centroid,_centroid,sizeof(*_centroid)*clusterCount*p);
+    } else {
+        memcpy(centroid,x,sizeof(*x)*clusterCount*p);
+    }
+    DBG_CODE(3,printDoubleMatrix("centroid",centroid,clusterCount,p));
 
     xc1=(double *)MEM_ALLOC(n*p,sizeof(double));
     xc2=(double *)MEM_ALLOC(n*p,sizeof(double));
 
     // proportional size of each cluster
     weightFactor=(double *)MEM_ALLOC(clusterCount,sizeof(double));
+    if (!IS_R_NULL(_WeightFactor)) {
+        for (i=0;i<clusterCount;i++) weightFactor[i]=_weightFactor[i];
+    } else {
+        for (i=0;i<clusterCount;i++) weightFactor[i]=0.0;
+    }
     // number of clusters whose relative size is at least
     // mahalanobis.distance.threshold
 
+    //R: fullMahalClusterCount<-sum(clusterSize>=thresh*fullPointCount)
     fullMahalClusterCount=0;
+    for (i=0;i<clusterCount;i++) {
+        if (clusterSize[i]>=thresh*nFull) fullMahalClusterCount++;
+    }
+    DBG(3,"fullMahalClusterCount=%d\n",fullMahalClusterCount);
     // have all clusters reached the thresh relative size and have we,
     // therefore, switched into "full Mahalanobis" mode?
-    switchedToFullMahal=0;
+    switchedToFullMahal=fullMahalClusterCount==clusterCount;
 
     ///////////////////////////////////////////////////////////////////
     // the main loop
     ///////////////////////////////////////////////////////////////////
     // merge two closest clusters at each step `s'
-    for (s=0;s<n-1;s++) {
+    //R: for (s in mySeq(pointCount-clusterCount+1,pointCount-1)) {
+    for (s=n-clusterCount;s<n-1;s++) {
         double v;
         LongNum source,target,count;
         Num distXIndicesLen;
@@ -904,12 +1023,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             DBG_CODE(2,{
                 DBGU("clusterSize[c1] %d\n",clusterSize[c1]);
                 DBGU("clusterSize[c2] %d\n",clusterSize[c2]);
-                DBGU("(clusterSize[c1] + clusterSize[c2]) / ( n * thresh ) %.3f\n",
-                     (clusterSize[c1] + clusterSize[c2]) / ( n * thresh ));
-                DBGU("n %d\n",n);
+                DBGU("(clusterSize[c1] + clusterSize[c2]) / ( nFull * thresh ) %.3f\n",
+                     (clusterSize[c1] + clusterSize[c2]) / ( nFull * thresh ));
+                DBGU("nFull %d\n",nFull);
                 DBGU("thresh %.3f\n",thresh );
             });
-            wf1=fmin2(1.0, (clusterSize[c1] + clusterSize[c2]) / ( n * thresh ) );
+            wf1=fmin2(1.0, (clusterSize[c1] + clusterSize[c2]) / ( nFull * thresh ) );
         } else {
             wf1=0;
         }
@@ -1065,7 +1184,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 //R:    pointCount-(clusterCount-1) < gMergingCount) { # and we are not done with clustering the samples from prior clusters
                 //R:    distX[iRelDistXIdx[ii]]<-Inf
                 //R: }
-                if (G!=R_NilValue && g[*members[c1]]!=g[*members[otherCluster]] && // clusters in distinct apriori clusters
+                if (!IS_R_NULL(G) && g[*members[c1]]!=g[*members[otherCluster]] && // clusters in distinct apriori clusters
                     n-(clusterCount-1) < gMergingCount) { // and we are not done with clustering the samples from prior clusters
                     distX[distXIdx]=0; // set the value meaning Inf (as distX is inverted and we find the maximum absolute value,
                     // 0 denote value that can't be found if there are still some unclustered samples)
@@ -1210,6 +1329,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG(5,"  membersPoolPos: %lu\n",membersPoolPos);
         Num *newMembers=membersPool+membersPoolPos;
         membersPoolPos+=n1+n2;
+        ASSERT(membersPoolPos<=membersPoolSize,"membersPool exhausted");
         DBG(5,"  copying members of cluster1\n");
         for (i=0;i<n1;i++) {
             newMembers[i]=members[c1][i];
