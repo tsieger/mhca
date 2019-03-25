@@ -56,6 +56,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,gDistIdx,
     if (!is.null(.distX)) {
         d<-.distX
     } else {
+        if (verb) cat('computing distance matrix\n')
         d<-dist(x)
     }
     if (!is.null(gDistIdx)) {
