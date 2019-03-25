@@ -180,7 +180,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
                 iLen<-length(i)
                 iLen1<-iLen-1L
                 xx<-x[i,]
-                if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),')\n'))
+                if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
                 mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
                 if (verb>1) cat('< returned from the recursive call\n')
                 if (verb>2) printWithName(mh)
