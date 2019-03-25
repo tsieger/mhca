@@ -688,10 +688,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     DBG(2,"clusterCount: %d\n",clusterCount);
 
     // check that the distance matrix can be indexed using a 'LongNum' index
-    DBG(3,"n*(n-1)/2: %ld\n",((long)n)*(n-1)/2);
-    DBG(3,"max representable length: %ld\n",(1l<<(sizeof(LongNum)*8-1))-1);
-    if (((long)n)*(n-1)/2>(1l<<(sizeof(LongNum)*8-1))-1) {
-        error("number of observations too large");
+    DBG(2,"n*(n-1)/2: %ld\n",((long)clusterCount)*(clusterCount-1)/2);
+    DBG(2,"max representable length: %ld\n",(1l<<(sizeof(LongNum)*8-1))-1);
+    if (((long)clusterCount)*(clusterCount-1)/2>(1l<<(sizeof(LongNum)*8-1))-1) {
+        error("number of clusters too large");
     }
 #ifdef ENABLE_DEBUGS
     // Allocate the global shared string buffer that should hold the string
