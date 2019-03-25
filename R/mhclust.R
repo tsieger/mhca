@@ -180,7 +180,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
                 iLen<-length(i)
                 iLen1<-iLen-1L
                 xx<-x[i,]
-                if (verb>1) cat('> recursive call\n')
+                if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),')\n'))
                 mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
                 if (verb>1) cat('< returned from the recursive call\n')
                 if (verb>2) printWithName(mh)
@@ -233,7 +233,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             if (verb>2) printWithName(gm)
 
             # step 2: merge the results of MHCA over apriori subclusters
-            if (verb>2) cat('merging the results of MHCA over apriori subclusters\n')
+            if (verb) cat('merging the results of MHCA over apriori subclusters\n')
             # we can't simply sort by height, as MHCA is non-monotonic, in general,
             # and naive sorting would produce incorrect dendrogram, in which not-yet-created
             # branches get used before they are formed; instead, we must merge
@@ -256,6 +256,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             if (verb>2) printWithName(gm[gho,])
             gIdx<-0L
             for (gti in 1:length(gt)) {
+                if (verb>1) cat(paste0(gti,'/',length(gt),'\n'))
                 if (verb>2) printWithName(gti)
                 gi<-gtLevels[gti]
                 i<-which(g==gi)
@@ -286,12 +287,13 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             if (verb>1) printWithName(clusterSize)
             if (verb>1) printWithName(members)
             if (verb>1) printWithName(centroid)
-            if (verb>1) printWithName(weightFactor)
-            if (verb>1) printWithName(detsSqrt)
-            if (verb>1) printWithName(invcov)
+            if (verb>2) printWithName(weightFactor)
+            if (verb>2) printWithName(detsSqrt)
+            if (verb>2) printWithName(invcov)
             if (verb>1) printWithName(merging)
             if (verb>1) printWithName(height)
             # initialize distance matrix
+            if (verb) cat('computing distances between apriori clusters\n')
             distX<-computeMahalDistMat(distX=NULL,nLeft,x,centroid,members,invcov,detsSqrt,normalize,quick,dbg=verb)
             gMergingCount<-0L
             gDistIdx<-NULL
