@@ -53,6 +53,8 @@
 #define MEM_ALLOC(n,size) R_alloc(n,size)
 #define MEM_FREE(p)
 
+#define MAX(a,b) (((a)>(b)) ? (a) : (b))
+
 typedef int Num; // e.g. cluster number
 typedef int LongNum; // e.g. index into distance matrix (needs to be an int in order e.g. to be passed to 'idamax')
 typedef unsigned int MatrixIndex; // e.g. index into distance matrix (in our internal code)
@@ -656,6 +658,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     x=REAL(X);
     distX=REAL(DistX);
     distXLen=LENGTH(DistX);
+    DBG(1,"allocating distance matrix of %ld entries (%ld B)\n",distXLen,distXLen*sizeof(*distXTmp));
     distXTmp=(double *)MEM_ALLOC(distXLen,sizeof(*distXTmp));
     merging=INTEGER(Merging);
     height=REAL(Height);
@@ -699,8 +702,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     // as well as the representation of the distance matrix (i.e. `n*(n-1)/2'
     // real values). Thus, we reserve `c*n' space with quite generous constant
     // `c' to hold e.g. long decimal expansion of real-valued distances.
-    DBG(2,"allocating %lu\n",20l*n*(n-1)/2*sizeof(char)); // note the '20l' not to let the 'int*int' overflow
-    strBuf=MEM_ALLOC(20l*n*(n-1)/2,sizeof(char)); // note the '20l' not to let the 'int*int' overflow
+    long nElem=MAX(clusterCount*(clusterCount-1)/2,n);
+    DBG(1,"allocating string buffer of %ld B\n",20l*nElem*sizeof(char)); // note the '20l' not to let the 'int*int' overflow
+    strBuf=MEM_ALLOC(20l*nElem,sizeof(char)); // note the '20l' not to let the 'int*int' overflow
     // two more another string buffers (shorter ones)
     strBufShort=MEM_ALLOC(20*n,sizeof(char));
     strBufShort2=MEM_ALLOC(20*n,sizeof(char));
@@ -744,8 +748,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     members=(Num**)MEM_ALLOC(clusterCount,sizeof(Num*));
     if (!IS_R_NULL(_Members)) {
         membersPoolSize=_membersPoolSize;
+        DBG(1,"allocating membersPool of %ld entries (%ld B)\n",membersPoolSize,membersPoolSize*sizeof(Num));
         membersPool=(Num*)MEM_ALLOC(membersPoolSize,sizeof(Num));
-        DBG(3,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
+        DBG(2,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
         membersPoolPos=0;
         for (i=0;i<clusterCount;i++) {
             members[i]=membersPool+membersPoolPos;
@@ -765,8 +770,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         // observation on each step.) This is a worst-case quadratic space,
         // while the optimal case would take only `O(n*log2(n))' space.
         membersPoolSize=clusterCount+((long)clusterCount-1)*(clusterCount+2)/2;
+        DBG(1,"allocating membersPool of %ld entries (%ld B)\n",membersPoolSize,membersPoolSize*sizeof(Num));
         membersPool=(Num*)MEM_ALLOC(membersPoolSize,sizeof(Num));
-        DBG(3,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
+        DBG(2,"membersPool %p: allocated %ld entries (%ld B)\n",membersPool,membersPoolSize,membersPoolSize*sizeof(Num));
         membersPoolPos=0;
         // create new lists of members
         for (i=0;i<clusterCount;i++) {
