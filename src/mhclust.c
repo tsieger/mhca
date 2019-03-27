@@ -967,9 +967,15 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         ASSERT(c1>=0,"invalid c1");
         ASSERT(c2>=0,"invalid c2");
         //R: if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',s+n,v,clusterId[c1],clusterId[c2],printMembers(members[[c1]]),printMembers(members[[c2]])))
-        DBG(1,"Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),
-            getMembers(members[c1],clusterSize[c1],strBuf),
-            getMembers(members[c2],clusterSize[c2],strBufShort));
+        DBG_CODE(1,{
+            if (dbg>1 || clusterSize[c1]+clusterSize[c2]<=25) {
+                DBGU("Cluster %d: depth %g, merged clusters %d and %d ((%s) and (%s)).\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]),
+                    getMembers(members[c1],clusterSize[c1],strBuf),
+                    getMembers(members[c2],clusterSize[c2],strBufShort));
+            } else {
+                DBGU("Cluster %d: depth %g, merged clusters %d and %d.\n",C2R(s+n),v,C2R(clusterId[c1]),C2R(clusterId[c2]));
+            }
+        });
         //R: merging[s,1:3]<-c(clusterId[i],clusterId[c2],v);
         merging[s]=C2R(clusterId[c1]);
         merging[s+(n-1)]=C2R(clusterId[c2]);

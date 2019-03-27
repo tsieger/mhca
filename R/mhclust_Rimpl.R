@@ -322,8 +322,15 @@ verb, ##<< level of verbosity, the greater the more detailed
         j<-as.integer(k-(i-1)*(clusterCount-i/2)+i)
         if (dbg>1) cat(sprintf('c1=%d, c2=%d\n',i,j))
 
-        if (dbg>0) cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',
-          s+pointCount,v,clusterId[i],clusterId[j],printClusterMembers(members[[i]]),printClusterMembers(members[[j]])))
+        if (dbg>0) {
+            if (dbg>1 || clusterSize[i] + clusterSize[j]<=25) {
+                cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d (%s and %s).\n',
+                    s+pointCount,v,clusterId[i],clusterId[j],printClusterMembers(members[[i]]),printClusterMembers(members[[j]])))
+            } else {
+                cat(sprintf('Cluster %d: depth %g, merged clusters %d and %d.\n',
+                    s+pointCount,v,clusterId[i],clusterId[j]))
+            }
+        }
 
         merging[s,1:3]<-c(clusterId[i],clusterId[j],v)
 
