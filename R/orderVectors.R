@@ -26,8 +26,8 @@ y ##<< second vector to merge
         return(seq(along=x))
     }
 
-    rv<-numeric(n)
-    ix<-iy<-1
+    rv<-integer(n)
+    ix<-iy<-1L
     for (i in 1:n) {
         if (x[ix]<=y[iy]) {
             rv[i]<-ix
@@ -35,14 +35,14 @@ y ##<< second vector to merge
                 rv[(i+1):n]<-nx+(iy:ny)
                 break
             }
-            ix<-ix+1
+            ix<-ix+1L
         } else {
             rv[i]<-iy+nx
             if (iy==ny) {
                 rv[(i+1):n]<-(ix:nx)
                 break
             }
-            iy<-iy+1
+            iy<-iy+1L
         }
     }
     return(rv)
