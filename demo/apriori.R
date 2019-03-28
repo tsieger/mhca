@@ -41,9 +41,11 @@ mh<-mhclust(x,thresh=.2)
 cmh<-cutree(mh,k=k)
 # MHCA with apriori clusters
 mhg<-mhclust(x,thresh=.25,g=rep(c(1:4),c(nrow(x1),nrow(x2),nrow(x3),nrow(x4))))
-# note the "thresh=.25" argument: wel-formed clusters are expected to be formed
+# note the "thresh=.25" argument: well-formed clusters are expected to be formed
 # by 25% of observations
 cmhg<-cutree(mhg,k=k)
+# heights of and above the apriori clusters:
+mhg$height[-(1:mhg$n.height.apriori)]
 
 # make plots
 opar<-par(mfcol=c(2,2))

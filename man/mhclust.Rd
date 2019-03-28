@@ -111,30 +111,14 @@ crossings of the branches.
 'method': 'mahalanobis-average'
 
 'dist.method': 'euclidean'
-A list with components:
 
-'merge': an n-1 by 2 matrix. The `i'-th row describes the two
-clusters merged at the `i'-th step of the clustering. If an
-element `j' is negative, then observation `-j' was merged at this
-stage.  If `j' is positive, the merge was with the cluster
-formed at the (earlier) stage `j' of the algorithm. Negative
-entries thus indicate agglomerations of singletons, and
-positive entries indicate agglomerations of non-singletons.
-
-'height': a set of `n'-1 non-decreasing real values, the
-clustering heights - the distances between the clusters merged
-at each step.
-
-'order': a vector giving the permutation of the original
-observations suitable for plotting, in the sense that a cluster
-plot using this ordering and matrix 'merge' will not have
-crossings of the branches.
-
-'labels': labels of each of the objects being clustered.
-
-'method': 'mahalanobis-average'
-
-'dist.method': 'euclidean'}
+'n.height.apriori': if non-trivial apriori clusters were
+supplied in the 'g' argument, this component holds the number
+of mergings within the apriori clusters. I.e., the first
+'n.height.apriori' entries of 'height' and 'merge' describe the
+mergings within the apriori clusters, while the subsequent
+entries describe the mergings of and above the apriori
+clusters.}
 \references{Fiser K., Sieger T., Schumich A., Wood B., Irving J.,
 Mejstrikova E., Dworzak MN. _Detection and monitoring of normal and
 leukemic cell populations with hierarchical clustering of flow

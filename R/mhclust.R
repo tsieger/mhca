@@ -136,7 +136,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # number of observations in the apriori clusters
         nApriori<-sum(gt)
         # number of mergings in apriori clusters
-        gMergingCount<-sum(gt-1L)
+        nHeightApriori<-gMergingCount<-sum(gt-1L)
         # number of clusters left to be merged after apriori clusters have been merged
         nLeft<-n-gMergingCount
         gtLevels<-as.integer(names(gt))
@@ -354,8 +354,11 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     # the inverse permutation gives the assignment of original observations to the leafs in the dendrogram
     ordering<-order(ordering)
 
-    tmp=list(merge=rv$merge,height=rv$height,order=ordering,labels=rownames(x),
+    tmp<-list(merge=rv$merge,height=rv$height,order=ordering,labels=rownames(x),
         method='mahalanobis-average',dist.method='euclidean')
+    if (!is.null(g)) {
+        tmp<-c(tmp,list(n.height.apriori=nHeightApriori))
+    }
     class(tmp)<-'hclust'
 
     return(tmp)
@@ -384,30 +387,14 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     ### 'method': 'mahalanobis-average'
     ###
     ### 'dist.method': 'euclidean'
-    ### A list with components:
     ###
-    ### 'merge': an n-1 by 2 matrix. The `i'-th row describes the two
-    ### clusters merged at the `i'-th step of the clustering. If an
-    ### element `j' is negative, then observation `-j' was merged at this
-    ### stage.  If `j' is positive, the merge was with the cluster
-    ### formed at the (earlier) stage `j' of the algorithm. Negative
-    ### entries thus indicate agglomerations of singletons, and
-    ### positive entries indicate agglomerations of non-singletons.
-    ###
-    ### 'height': a set of `n'-1 non-decreasing real values, the
-    ### clustering heights - the distances between the clusters merged
-    ### at each step.
-    ###
-    ### 'order': a vector giving the permutation of the original
-    ### observations suitable for plotting, in the sense that a cluster
-    ### plot using this ordering and matrix 'merge' will not have
-    ### crossings of the branches.
-    ###
-    ### 'labels': labels of each of the objects being clustered.
-    ###
-    ### 'method': 'mahalanobis-average'
-    ###
-    ### 'dist.method': 'euclidean'
+    ### 'n.height.apriori': if non-trivial apriori clusters were
+    ### supplied in the 'g' argument, this component holds the number
+    ### of mergings within the apriori clusters. I.e., the first
+    ### 'n.height.apriori' entries of 'height' and 'merge' describe the
+    ### mergings within the apriori clusters, while the subsequent
+    ### entries describe the mergings of and above the apriori
+    ### clusters.
 },ex=function() {
   opar<-par(mfrow=c(2,2))
 
