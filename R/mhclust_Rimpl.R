@@ -70,10 +70,6 @@ g, ##<< Optional assignment of samples to apriori clusters that
 gMergingCount, ##<< number of merging operations to be performed when
 ## forming the apriori clusters (this is directly computed from `g' and
 ## appears here only to eliminate code duplication).
-gDistIdx, ##<< indices into the distance matrix where entries holding
-## distances between members of the apriori clusters appear (this is
-## directly computed from `g' and appears here only to eliminate code
-## duplication).
 verb, ##<< level of verbosity, the greater the more detailed
 ## info, defaults to 0 (no info).
 .nFull = NULL, ##<< number of observations; this equals
@@ -198,9 +194,6 @@ verb, ##<< level of verbosity, the greater the more detailed
     } else {
         # compute distance matrix
         distX<-dist(x)
-    }
-    if (!is.null(gDistIdx)) {
-      distX[-gDistIdx]<-Inf
     }
     # merging: the output of the clustering - the structure of clusters
     merging<-matrix(0,pointCount-1,3)

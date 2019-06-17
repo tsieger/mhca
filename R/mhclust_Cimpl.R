@@ -6,7 +6,7 @@ mhclust_c<-function(X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingC
         .NFull,.NLeft,.Centroid,.Members,.Invcov,.DetsSqrt,.WeightFactor,.ClusterId,.ClusterSize,.membersPoolSize)
 }
 
-mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,gDistIdx,verb,
+mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
     .nFull,.nLeft,.distX,.centroid,.members,.invcov,.detsSqrt,.weightFactor,.clusterId,.clusterSize,.merging,.height) {
 
     if (verb>2) {
@@ -58,11 +58,6 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,gDistIdx,
     } else {
         if (verb) cat('computing distance matrix\n')
         d<-dist(x)
-    }
-    if (!is.null(gDistIdx)) {
-      # force distances between distinct apriori clusters to be much greater
-      # than the largest distance (we can't use Inf for technical reasons)
-      d[-gDistIdx]<-1000*max(d)
     }
     merge<-matrix(0L,n-1,2)
     if (!is.null(.merging)) {
