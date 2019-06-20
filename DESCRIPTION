@@ -6,7 +6,7 @@ Date: 2019-02-06
 Author: Tomas Sieger, Karel Fiser
 Depends: 
 Imports: stats
-Suggests: testthat
+Suggests: doMC, testthat
 URL: http://github.com/tsieger/mhca
 Maintainer: Tomas Sieger <tomas.sieger@seznam.cz>
 BugReports: https://github.com/tsieger/mhca/issues
