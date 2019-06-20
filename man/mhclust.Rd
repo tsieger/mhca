@@ -4,8 +4,8 @@
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
 \usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    gIntra = TRUE, normalize = FALSE, verb = 0, verbRecursive = verb, 
-    useR = FALSE, nFull = nrow(as.matrix(x)))}
+    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, verb = 0, 
+    verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -39,6 +39,10 @@ the intrinsic structure of the apriori clusters is not of interest
 (the corresponding elements of the result are not defined and should
 be ignored) and clustering starts directly from the level of the
 apriori clusters. Run \code{demo(aprioriNonIntra)}' for an example.}
+  \item{gParallel}{boolean. If \code{TRUE}, and \code{gIntra} is
+also \code{TRUE}, apriori clusters get formed in parallel using the
+\code{doMC} package. If \code{FALSE}, apriori clusters get formed
+sequentially.}
   \item{normalize}{boolean. If \code{TRUE}, cluster size
 will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the

@@ -2,3 +2,4 @@ apriori             Mahalanobis HCA with apriori clusters demo
 aprioriNonIntra     Mahalanobis HCA with apriori clusters with ignorable internal structure demo
 big                 big data demo: using apriori clusters can save space and time
 bigger              Mahalanobis HCA with 1,000,000 observations in 1,000 apriori clusters
+parallel            Mahalanobis HCA with parallel clustering of apriori clusters

@@ -69,6 +69,10 @@ gIntra = TRUE, ##<< boolean. If \code{TRUE}, the intrinsic structure of
 ## (the corresponding elements of the result are not defined and should
 ## be ignored) and clustering starts directly from the level of the
 ## apriori clusters. Run \code{demo(aprioriNonIntra)}' for an example.
+gParallel = TRUE, ##<< boolean. If \code{TRUE}, and \code{gIntra} is
+## also \code{TRUE}, apriori clusters get formed in parallel using the
+## \code{doMC} package. If \code{FALSE}, apriori clusters get formed
+## sequentially.
 normalize = FALSE, ##<< boolean. If \code{TRUE}, cluster size
 ## will be ignored when computing Mahalanobis distance from the
 ## cluster. If \code{FALSE}, once all clusters are of at least the
@@ -171,6 +175,20 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # step 1: perform recursive MHCA over apriori subclusters
         #
         # iterate over apriori clusters
+        if (gIntra && gParallel && require(doMC)) {
+            if (verb) cat(paste0('parallelizing MHCA\n'))
+            registerDoMC()
+            mhs<-foreach(gti=1:length(gt)) %dopar% {
+                gi<-gtLevels[gti]
+                i<-which(g==gi)
+                iLen<-length(i)
+                iLen1<-iLen-1L
+                xx<-x[i,]
+                mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
+            }
+        } else {
+            mhs<-NULL
+        }
         for (gti in 1:length(gt)) {
             gi<-gtLevels[gti]
             i<-which(g==gi)
@@ -179,9 +197,13 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             iLen1<-iLen-1L
             xx<-x[i,]
             if (gIntra) {
-                if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
-                mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
-                if (verb>1) cat('< returned from the recursive call\n')
+                if (!is.null(mhs)) {
+                    mh<-mhs[[gti]]
+                } else {
+                    if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
+                    mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
+                    if (verb>1) cat('< returned from the recursive call\n')
+                }
             } else {
                 # make up a fake, but valid merge structure:
                 # -1, -2
