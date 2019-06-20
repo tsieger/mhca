@@ -4,8 +4,8 @@
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
 \usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    normalize = FALSE, verb = 0, verbRecursive = verb, useR = FALSE, 
-    nFull = nrow(as.matrix(x)))}
+    gIntra = TRUE, normalize = FALSE, verb = 0, verbRecursive = verb, 
+    useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -23,15 +23,22 @@ cluster shape as estimated by the covariance matrix of its members.}
   \item{quick}{boolean. If \code{TRUE}, inter-cluster
 distances will be computed using centroids only. If \code{FALSE},
 all observations contained in the clusters will be used.}
-  \item{g}{Optional assignment of samples to apriori clusters that
-should get formed (in a hierarchical fashion) before any other
-merging takes place. By default, there are no apriori clusters, and
-clustering starts from individual observations. If `g' is supplied,
-a numeric vector of length corresponding to the number of rows of
-`x' is expected, holding the index of apriori cluster each sample is
-member of. 0's can appear in the vector meaning that the
-corresponding sample is not member of any apriori cluster. See the
-`apriori' demo for an example.}
+  \item{g}{Optional assignment of samples to apriori clusters. By
+default, there are no apriori clusters, and clustering starts from
+individual observations. If \code{g} is supplied, the clustering
+process depends on the value of the \code{gIntra} argument.
+\code{g} is expected to be a numeric vector of length corresponding
+to the number of rows of \code{x}, holding the index of apriori
+cluster each sample is member of. \code{0}'s can appear in the
+vector meaning that the corresponding sample is not member of any
+apriori cluster. Run \code{demo(apriori)} for an example.}
+  \item{gIntra}{boolean. If \code{TRUE}, the intrinsic structure of
+the apriori clusters (defined using the \code{g} argument) gets
+computed before the apriori clusters get clustered. If \code{FALSE},
+the intrinsic structure of the apriori clusters is not of interest
+(the corresponding elements of the result are not defined and should
+be ignored) and clustering starts directly from the level of the
+apriori clusters. Run \code{demo(aprioriNonIntra)}' for an example.}
   \item{normalize}{boolean. If \code{TRUE}, cluster size
 will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the

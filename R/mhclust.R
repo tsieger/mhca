@@ -53,15 +53,22 @@ scale = FALSE, ##<< boolean. Should we transform observations by the
 quick = FALSE, ##<< boolean. If \code{TRUE}, inter-cluster
 ## distances will be computed using centroids only. If \code{FALSE},
 ## all observations contained in the clusters will be used.
-g = NULL, ##<< Optional assignment of samples to apriori clusters that
-## should get formed (in a hierarchical fashion) before any other
-## merging takes place. By default, there are no apriori clusters, and
-## clustering starts from individual observations. If `g' is supplied,
-## a numeric vector of length corresponding to the number of rows of
-## `x' is expected, holding the index of apriori cluster each sample is
-## member of. 0's can appear in the vector meaning that the
-## corresponding sample is not member of any apriori cluster. See the
-## `apriori' demo for an example.
+g = NULL, ##<< Optional assignment of samples to apriori clusters. By
+## default, there are no apriori clusters, and clustering starts from
+## individual observations. If \code{g} is supplied, the clustering
+## process depends on the value of the \code{gIntra} argument.
+## \code{g} is expected to be a numeric vector of length corresponding
+## to the number of rows of \code{x}, holding the index of apriori
+## cluster each sample is member of. \code{0}'s can appear in the
+## vector meaning that the corresponding sample is not member of any
+## apriori cluster. Run \code{demo(apriori)} for an example.
+gIntra = TRUE, ##<< boolean. If \code{TRUE}, the intrinsic structure of
+## the apriori clusters (defined using the \code{g} argument) gets
+## computed before the apriori clusters get clustered. If \code{FALSE},
+## the intrinsic structure of the apriori clusters is not of interest
+## (the corresponding elements of the result are not defined and should
+## be ignored) and clustering starts directly from the level of the
+## apriori clusters. Run \code{demo(aprioriNonIntra)}' for an example.
 normalize = FALSE, ##<< boolean. If \code{TRUE}, cluster size
 ## will be ignored when computing Mahalanobis distance from the
 ## cluster. If \code{FALSE}, once all clusters are of at least the
@@ -171,9 +178,23 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             iLen<-length(i)
             iLen1<-iLen-1L
             xx<-x[i,]
-            if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
-            mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
-            if (verb>1) cat('< returned from the recursive call\n')
+            if (gIntra) {
+                if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
+                mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
+                if (verb>1) cat('< returned from the recursive call\n')
+            } else {
+                # make up a fake, but valid merge structure:
+                # -1, -2
+                # -3, 1
+                # -4, 2
+                # etc.
+                tmp.merge<-c(-1,-2)
+                if (iLen>2) {
+                   tmp.merge<-rbind(tmp.merge,cbind(1:(iLen-2),-(3:iLen)))
+                }
+                tmp.height<-rep(0,iLen-1)
+                mh<-list(merge=tmp.merge,height=tmp.height)
+            }
             if (verb>2) printWithName(mh)
             if (verb>2) printWithName(mh$height)
             if (verb>2) printWithName(mh$merge)

@@ -5,9 +5,9 @@
 set.seed(1)
 x0n<-100
 # a unit uniform circle
-x0<-data.frame(x=runif(2*x0n,-1,1),y=runif(2*x0n,-1,1))
-x0<-x0[x0$x^2+x0$y^2<1,]
-x0<-x0[1:min(nrow(x0),x0n),]
+tmpRadius<-sqrt(runif(x0n))
+tmpAngle<-runif(x0n)*2*pi
+x0<-data.frame(x=tmpRadius*cos(tmpAngle),y=tmpRadius*sin(tmpAngle))
 # shift
 a<-1.5
 # scaling
