@@ -3,8 +3,8 @@ mhclust<-structure(function # mhca
 ###
 ##details<<
 ##   This is 'mahalanobis-average' hierarchical clustering similar to
-##   `hclust' with advanced merging strategy. The shape of clusters is
-##   considered when computing inter-cluster distances.
+##   \code{\link{hclust}} with advanced merging strategy. The shape of clusters
+##   is considered when computing inter-cluster distances.
 ##
 ##   The distance between two clusters `c1' and `c2' is the mean of
 ##   the distances of members of `c1' to the cluster `c2' and the distances
@@ -161,6 +161,9 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         gh<-integer(gMergingCount)
         # 'merge' accumulated over recursive calls
         gm<-matrix(0L,gMergingCount,2)
+        # "g labels" of observations accumulated over recursive calls
+        # i.e. the ids of group each observation is member of
+        gl<-integer(gMergingCount)
         # members of apriori clusters
         members<-vector('list',nLeft)
         # centroids of apriori clusters
@@ -249,6 +252,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             mh$merge[mh$merge<0]<--i[-mh$merge[mh$merge<0]]
             #  (the clusters formed will get transformed later)
             gm[gIdx+(1:iLen1),]<-mh$merge
+            gl[gIdx+(1:iLen1)]<-gi
             gIdx<-gIdx+iLen1
         }
         tmp<-which(g==0)
@@ -309,6 +313,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # sort the accumulated data according to the increasing height of the HCA structure in each apriori cluster
         height<-gh[gho]
         merging<-gm[gho,]
+        gLabels<-gl[gho]
         # convert merging to the internal style: all indices are positive
         if (verb>2) cat('merging pre tx\n')
         if (verb>2) printWithName(merging)
@@ -371,7 +376,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     tmp<-list(merge=rv$merge,height=rv$height,order=ordering,labels=rownames(x),
         method='mahalanobis-average',dist.method='euclidean')
     if (!is.null(g)) {
-        tmp<-c(tmp,list(n.height.apriori=nHeightApriori))
+        tmp<-c(tmp,list(n.height.apriori=nHeightApriori,g.labels=gLabels))
     }
     class(tmp)<-'hclust'
 
@@ -409,6 +414,12 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     ### mergings within the apriori clusters, while the subsequent
     ### entries describe the mergings of and above the apriori
     ### clusters.
+    ###
+    ### 'g.labels': if non-trivial apriori clusters were
+    ### supplied in the 'g' argument, this is a numeric vector of
+    ### length 'n.height.apriori', which for each merging within apriori
+    ### clusters holds the id of the apriori cluster the merging
+    ### appears within.
 },ex=function() {
   opar<-par(mfrow=c(2,2))
 

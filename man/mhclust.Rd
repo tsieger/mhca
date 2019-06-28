@@ -63,8 +63,8 @@ calls over a subset of \code{x} it refers to the original full
 data set (internal parameter)}
 }
 \details{This is 'mahalanobis-average' hierarchical clustering similar to
-`hclust' with advanced merging strategy. The shape of clusters is
-considered when computing inter-cluster distances.
+\code{\link{hclust}} with advanced merging strategy. The shape of clusters
+is considered when computing inter-cluster distances.
 
 The distance between two clusters `c1' and `c2' is the mean of
 the distances of members of `c1' to the cluster `c2' and the distances
@@ -121,7 +121,13 @@ of mergings within the apriori clusters. I.e., the first
 'n.height.apriori' entries of 'height' and 'merge' describe the
 mergings within the apriori clusters, while the subsequent
 entries describe the mergings of and above the apriori
-clusters.}
+clusters.
+
+'g.labels': if non-trivial apriori clusters were
+supplied in the 'g' argument, this is a numeric vector of
+length 'n.height.apriori', which for each merging within apriori
+clusters holds the id of the apriori cluster the merging
+appears within.}
 \references{Fiser K., Sieger T., Schumich A., Wood B., Irving J.,
 Mejstrikova E., Dworzak MN. _Detection and monitoring of normal and
 leukemic cell populations with hierarchical clustering of flow
