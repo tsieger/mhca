@@ -15,7 +15,7 @@ verb=0 ##<< verbosity level
     if (verb) printWithName(m)
     # n = # of leafs
     n<-m+1
-    if (verb) printWithName(m)
+    if (verb) printWithName(n)
 
     # compute 'order'
     lifo<-rep(0,m)
