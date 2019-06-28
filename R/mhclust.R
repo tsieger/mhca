@@ -35,7 +35,8 @@ mhclust<-structure(function # mhca
 ## cytometry data_. Cytometry A. 2012 Jan;81(1):25-34.
 ## doi:10.1002/cyto.a.21148.
 ##
-##seealso<< \code{\link[stats]{hclust}}, \code{\link[cluster]{agnes}}.
+##seealso<< \code{\link[stats]{hclust}}, \code{\link[cluster]{agnes}},
+## \code{\link{cutreeApriori}}.
 ##
 (x, ##<< data.frame or matrix containing coordinates of elementary
 ## observations. Rows correspond to observations, columns correspond
@@ -420,6 +421,11 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     ### length 'n.height.apriori', which for each merging within apriori
     ### clusters holds the id of the apriori cluster the merging
     ### appears within.
+    ### 
+    ### If apriori clusters were supplied, \code{\link{cutreeApriori}}
+    ### can be used to cut off the within-apriori mergings from this
+    ### tree object to focus on the mergings of the apriori clusters.
+
 },ex=function() {
   opar<-par(mfrow=c(2,2))
 
