@@ -46,7 +46,10 @@ verb=0 ##<< verbosity level
         h$height<-h$height[-(1:m)]
 
         # compute the cut 'order':
-        h$order<-computeLeafOrder(h$merge)
+        ordering<-computeLeafOrder(h$merge)
+        # the inverse permutation gives the assignment of observations
+        # to the leafs in the dendrogram
+        h$order<-order(ordering)
 
         # remove entries specific to apriori clusters, which are now
         # not contained in the tree:
