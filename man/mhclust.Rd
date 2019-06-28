@@ -127,7 +127,11 @@ clusters.
 supplied in the 'g' argument, this is a numeric vector of
 length 'n.height.apriori', which for each merging within apriori
 clusters holds the id of the apriori cluster the merging
-appears within.}
+appears within.
+
+If apriori clusters were supplied, \code{\link{cutreeApriori}}
+can be used to cut off the within-apriori mergings from this
+tree object to focus on the mergings of the apriori clusters.}
 \references{Fiser K., Sieger T., Schumich A., Wood B., Irving J.,
 Mejstrikova E., Dworzak MN. _Detection and monitoring of normal and
 leukemic cell populations with hierarchical clustering of flow
@@ -138,7 +142,8 @@ doi:10.1002/cyto.a.21148.
 
 
 
-\seealso{\code{\link[stats]{hclust}}, \code{\link[cluster]{agnes}}.
+\seealso{\code{\link[stats]{hclust}}, \code{\link[cluster]{agnes}},
+\code{\link{cutreeApriori}}.
 }
 \examples{
 opar<-par(mfrow=c(2,2))
