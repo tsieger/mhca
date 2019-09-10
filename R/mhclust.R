@@ -3,7 +3,7 @@ mhclust<-structure(function # mhca
 ###
 ##details<<
 ##   This is 'mahalanobis-average' hierarchical clustering similar to
-##   \code{\link{hclust}} with advanced merging strategy. The shape of clusters
+##   \code{\link[stats]{hclust}} with advanced merging strategy. The shape of clusters
 ##   is considered when computing inter-cluster distances.
 ##
 ##   The distance between two clusters `c1' and `c2' is the mean of
