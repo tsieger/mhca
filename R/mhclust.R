@@ -179,10 +179,10 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # step 1: perform recursive MHCA over apriori subclusters
         #
         # iterate over apriori clusters
-        if (gIntra && gParallel && require(doMC)) {
+        if (gIntra && gParallel && requireNamespace('doMC')) {
             if (verb) cat(paste0('parallelizing MHCA\n'))
-            registerDoMC()
-            mhs<-foreach(gti=1:length(gt)) %dopar% {
+            doMC::registerDoMC()
+            mhs<-foreach::foreach(gti=1:length(gt)) %dopar% {
                 gi<-gtLevels[gti]
                 i<-which(g==gi)
                 iLen<-length(i)
