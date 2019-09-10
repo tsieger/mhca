@@ -47,9 +47,10 @@ fixNonMonotHca<-structure(function
 },ex=function() {
     d<-cbind(1:3,1:3)
     hd<-mhclust(d)
+    # original dendrogram
+    print(hd$height)
+
     hdFixed<-fixNonMonotHca(hd)
-    opar<-par(mfrow=c(1,2))
-    plot(hd,main='Original dendrogram')
-    plot(hdFixed,main='Dendrogram with non-monotonous height fixed')
-    par(opar)
+    # dendrogram with resolved non-monotonous heights
+    print(hdFixed$height)
 })
