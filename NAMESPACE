@@ -4,3 +4,4 @@ import(stats)
 
 export(mhclust)
 export(cutreeApriori)
+export(fixNonMonotHca)
