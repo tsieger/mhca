@@ -137,13 +137,18 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         #     clusterIds = 9,10 (n+gMergingCount-length(gt))
         # restrict to clusters of at least 2 observations
         gt<-gt[gt>1]
+        if (verb>1) printWithName(gt)
         # number of observations in the apriori clusters
         nApriori<-sum(gt)
+        if (verb>1) printWithName(nApriori)
         # number of mergings in apriori clusters
         nHeightApriori<-gMergingCount<-sum(gt-1L)
+        if (verb>1) printWithName(gMergingCount)
         # number of clusters left to be merged after apriori clusters have been merged
         nLeft<-n-gMergingCount
+        if (verb>1) printWithName(nLeft)
         gtLevels<-as.integer(names(gt))
+        if (verb>1) printWithName(gtLevels)
 
         # cluster apriori clusters first, then merge the clusterings,
         # and cluster the apriori clusters subsequently
@@ -256,11 +261,14 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             gl[gIdx+(1:iLen1)]<-gi
             gIdx<-gIdx+iLen1
         }
-        tmp<-which(g==0)
-        if (length(tmp)>0) {
-            for (i in 1:length(tmp)) {
-                members[length(gt)+i]<-tmp[i]
-                centroid[length(gt)+i,]<-x[tmp[i],,drop=FALSE]
+        singletons<-which(!g%in%gtLevels) # single observations, not part of merged apriori clusters
+        if (verb>3) printWithName(g)
+        if (verb>3) printWithName(gtLevels)
+        if (verb>2) printWithName(singletons)
+        if (length(singletons)>0) {
+            for (i in 1:length(singletons)) {
+                members[length(gt)+i]<-singletons[i]
+                centroid[length(gt)+i,]<-x[singletons[i],,drop=FALSE]
                 weightFactor[length(gt)+i]<-0.0
                 detsSqrt[length(gt)+i]<-1.0
                 invcov[[length(gt)+i]]<-fakeInvCov
@@ -288,6 +296,9 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # 'gho[ggLastIndices]' then hold the indices of the apriori clusters
         # as formed by HCA, sorted according the their heights
         clusterId<-ghoRank[ggLastIndices]+n
+        # append ids of singleton clusters
+        clusterId<-c(clusterId,singletons)
+        if (verb>2) printWithName(clusterId)
         if (verb>2) printWithName(ggLastIndices)
 
         # the second pass through apriori clusters
