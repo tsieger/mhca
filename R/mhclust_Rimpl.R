@@ -406,7 +406,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                 }
 
                 # if we are still clustering samples of the apriori clusters, the distance
-                # between clusters in disctinct apriori clusters arem by definition, se to Inf
+                # between clusters in disctinct apriori clusters are, by definition, set to Inf
                 if (!is.null(g) && g[members[[i]][1]]!=g[members[[otherClusters[ii]]][1]] && # clusters in distinct apriori clusters
                      pointCount-(clusterCount-1) < gMergingCount) { # and we are not done with clustering the samples from prior clusters
                     # the distance between clusters in different apriori clusters is defined to be Inf
