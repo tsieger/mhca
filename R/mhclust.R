@@ -388,7 +388,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     tmp<-list(merge=rv$merge,height=rv$height,order=ordering,labels=rownames(x),
         method='mahalanobis-average',dist.method='euclidean')
     if (!is.null(g)) {
-        tmp<-c(tmp,list(n.height.apriori=nHeightApriori,g.labels=gLabels))
+        tmp<-c(tmp,list(g=g,n.height.apriori=nHeightApriori,g.labels=gLabels))
     }
     class(tmp)<-'hclust'
 
@@ -418,6 +418,10 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     ### 'method': 'mahalanobis-average'
     ###
     ### 'dist.method': 'euclidean'
+    ###
+    ### 'g': if non-trivial apriori clusters were supplied in the 'g'
+    ### argument, this holds the 'g' assignment of samples to apriori
+    ### clusters.
     ###
     ### 'n.height.apriori': if non-trivial apriori clusters were
     ### supplied in the 'g' argument, this component holds the number
