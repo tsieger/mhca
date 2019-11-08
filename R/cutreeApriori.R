@@ -58,9 +58,9 @@ verb=0 ##<< verbosity level
         # represented as negative numbers - refer to the original
         # assignment of observations to apriori clusters in 'g'
         id[i<0]<-h$g[-i[i<0]]
-        if (verb>1) .pn(id)
+        if (verb>1) printWithName(id)
         # sort the labels to correspond to 'h$merge'
-        if (verb>1) .pn(order(i))
+        if (verb>1) printWithName(order(i))
         h$labels<-paste(id)[order(i)]
         if (verb>1) printWithName(h$labels)
 
