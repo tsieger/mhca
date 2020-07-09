@@ -24,8 +24,9 @@ method=c('eps','halfway'), ##<< replacement method, one of 'eps', and
 ## gives nicer dendrogram at the expense of making the heights too
 ## artificial. See examples.
 eps = NULL ##<< parameter of the 'eps' method, if \code{NULL}, it
-## defaults to half of the minimal difference in monotonous heights, or
-## \code{1}, if there are no consecutive monotonous heights.
+## defaults to half of the minimal positive difference in monotonous
+## heights, or \code{1}, if there are no consecutive monotonous
+## heights.
 ) {
     method<-match.arg(method)
 
@@ -43,10 +44,10 @@ eps = NULL ##<< parameter of the 'eps' method, if \code{NULL}, it
             }
         }
 
-        if (any(dh<=0)) {
+        if (any(dh<0)) {
             lastH<-0
             for (i in 1:n) {
-                if (h[i]<=lastH) {
+                if (h[i]<lastH) {
                     lastH<-h[i]<-lastH+eps
                 } else {
                     lastH<-h[i]
@@ -58,14 +59,14 @@ eps = NULL ##<< parameter of the 'eps' method, if \code{NULL}, it
         h<-hca$height
         n<-length(h)
         dh<-diff(h)
-        idx<-which(dh<=0)
+        idx<-which(dh<0)
         idx_len<-length(idx)
         idx_i<-1
         while (idx_i <= idx_len) {
             i<-idx[idx_i]+1
             # i is the FIRST "bad" value index in a chunk of "bad" values
             j<-i+1
-            while (j<=n && h[j]<=h[i-1]) j<-j+1
+            while (j<=n && h[j]<h[i-1]) j<-j+1
             # j is AFTER the last "bad" value in a chunk of "bad" values
             if (j>n) {
                 if (i>2) {

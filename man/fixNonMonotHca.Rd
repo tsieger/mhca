@@ -17,8 +17,9 @@ heights lying halfway between neighbouring monotonous heights. This
 gives nicer dendrogram at the expense of making the heights too
 artificial. See examples.}
   \item{eps}{parameter of the 'eps' method, if \code{NULL}, it
-defaults to half of the minimal difference in monotonous heights, or
-\code{1}, if there are no consecutive monotonous heights.}
+defaults to half of the minimal positive difference in monotonous
+heights, or \code{1}, if there are no consecutive monotonous
+heights.}
 }
 \details{\code{\link{fixNonMonotHca}} replaces non-monotonous heights in a
 dendrogram representing a hierarchical clustering with artificial
