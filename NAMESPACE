@@ -2,7 +2,7 @@ useDynLib(mhca,mhclust_)
 
 import(stats)
 
-export(mhclust)
 export(computeLeafOrder)
 export(cutreeApriori)
 export(fixNonMonotHca)
+export(mhclust)
