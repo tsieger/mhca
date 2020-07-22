@@ -329,7 +329,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # convert merging to the internal style: all indices are positive
         if (verb>2) cat('merging pre tx\n')
         if (verb>2) printWithName(merging)
-        merging[merging>0]<-merging[merging>0]+nApriori
+        merging[merging>0]<-merging[merging>0]+n
         merging[merging<0]<--merging[merging<0]
         if (verb>2) cat('merging post tx\n')
         if (verb>2) printWithName(merging)
