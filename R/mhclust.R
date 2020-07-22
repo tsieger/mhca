@@ -394,6 +394,14 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     }
     class(tmp)<-'hclust'
 
+    if (!checkHca(tmp,verb=FALSE)) {
+        # the HCA result is corrupted!
+        # provide some info on the problem
+        checkHca(tmp)
+        # and fail
+        stop('INTERNAL ERROR: the result is inconsistent. Please, report the problem and provide a reproducible example.')
+    }
+
     return(tmp)
     ### An object of class *hclust*. The object is a list with
     ### components:
