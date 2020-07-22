@@ -4,8 +4,8 @@
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
 \usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, verb = 0, 
-    verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
+    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, warn = TRUE, 
+    verb = 0, verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -48,6 +48,8 @@ will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the
 \code{thresh} relative size, both cluster shape and size will
 affect inter-cluster distance.}
+  \item{warn}{boolean. If \code{FALSE}, warnings about
+non-monotonous heights will be suppressed.}
   \item{verb}{level of verbosity, the greater the more detailed
 info, defaults to 0 (no info).}
   \item{verbRecursive}{level of verbosity of the recursive calls}
@@ -114,6 +116,10 @@ crossings of the branches.
 'method': 'mahalanobis-average'
 
 'dist.method': 'euclidean'
+
+'g': if non-trivial apriori clusters were supplied in the 'g'
+argument, this holds the 'g' assignment of samples to apriori
+clusters.
 
 'n.height.apriori': if non-trivial apriori clusters were
 supplied in the 'g' argument, this component holds the number

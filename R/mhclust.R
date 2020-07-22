@@ -79,6 +79,8 @@ normalize = FALSE, ##<< boolean. If \code{TRUE}, cluster size
 ## cluster. If \code{FALSE}, once all clusters are of at least the
 ## \code{thresh} relative size, both cluster shape and size will
 ## affect inter-cluster distance.
+warn = TRUE, ##<< boolean. If \code{FALSE}, warnings about
+## non-monotonous heights will be suppressed.
 verb = 0, ##<< level of verbosity, the greater the more detailed
 ## info, defaults to 0 (no info).
 verbRecursive = verb, ##<< level of verbosity of the recursive calls
@@ -372,7 +374,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     rv$merge[,1]<-mn
     rv$merge[,2]<-mx
 
-    if (any(diff(rv$height)<0) && nFull==n) warning('clusters form non-monotonic tree')
+    if (warn && any(diff(rv$height)<0) && nFull==n) warning('clusters form non-monotonic tree')
 
     # follow the style of hclust: observations get represented by negative numbers, clusters by positive numbers
     rv$merge[rv$merge<=n]<- -rv$merge[rv$merge<=n]
