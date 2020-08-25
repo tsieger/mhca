@@ -178,10 +178,14 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         centroid<-matrix(NA,nLeft,ncol(x))
         # weight factors of apriori clusters
         weightFactor<-numeric(nLeft)
-        # square roots of determinants of the covariance matrices of the apriori clusters
-        detsSqrt<-numeric(nLeft)
         # covariance matrices of the apriori clusters
         invcov<-vector('list',nLeft)
+        # normalization multiplicative factors making 'invcov' to have unit volume (i.e. determinant of 1) when appropriate,
+        # technically 'det(invcovNmf*invcov) = 1', i.e. 'invcovNmf = [ 1/det(invcov) ]^(1/p),
+        # where 'p' is the number of dimensions, and the '^(1/p)' appears here because all entries of 'invcov'
+        # get multiplied by 'invcovNmf', such that 'invcovNmf' contributes to 'det(invcovNmf*invcov)'
+        # 'p'-times ('det(invcovNmf*invcov) = invcovNmf^p * det(invcov)').
+        invcovNmf<-numeric(nLeft)
 
         # step 1: perform recursive MHCA over apriori subclusters
         #
@@ -249,7 +253,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             covXx<-cov(xx)
             covXx<-wf1*covXx+(1-wf1)*fakeInvCov
             c.cholDecomp<-tryCatch(chol(covXx),error=function(e)fakeInvCov)
-            detsSqrt[gti]<-(1/prod(diag(c.cholDecomp)))^(2/ncol(x))
+            invcovNmf[gti]<-(1/prod(diag(c.cholDecomp)))^(2/ncol(x))
             invcov[[gti]]<-chol2inv(c.cholDecomp)
 
             # accumulate the 'height' from the recursive call
@@ -272,7 +276,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
                 members[length(gt)+i]<-singletons[i]
                 centroid[length(gt)+i,]<-x[singletons[i],,drop=FALSE]
                 weightFactor[length(gt)+i]<-0.0
-                detsSqrt[length(gt)+i]<-1.0
+                invcovNmf[length(gt)+i]<-1.0
                 invcov[[length(gt)+i]]<-fakeInvCov
             }
         }
@@ -341,27 +345,27 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         if (verb>1) printWithName(members)
         if (verb>1) printWithName(centroid)
         if (verb>2) printWithName(weightFactor)
-        if (verb>2) printWithName(detsSqrt)
+        if (verb>2) printWithName(invcovNmf)
         if (verb>2) printWithName(invcov)
         if (verb>1) printWithName(merging)
         if (verb>1) printWithName(height)
         # initialize distance matrix
         if (verb) cat('computing distances between apriori clusters\n')
-        distX<-computeMahalDistMat(distX=NULL,nLeft,x,centroid,members,invcov,detsSqrt,normalize,quick,dbg=verb)
+        distX<-computeMahalDistMat(distX=NULL,nLeft,x,centroid,members,invcov,invcovNmf,normalize,quick,dbg=verb)
         gMergingCount<-0L
     } else {
         # g not specified
         gMergingCount<-0L
-        nLeft<-distX<-centroid<-members<-invcov<-detsSqrt<-weightFactor<-clusterId<-clusterSize<-merging<-height<-NULL
+        nLeft<-distX<-centroid<-members<-invcov<-invcovNmf<-weightFactor<-clusterId<-clusterSize<-merging<-height<-NULL
     }
 
     # implementation switch
     if (useR) {
         if (verb) cat('using R implementation\n')
-        rv<-mhclust_Rimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,detsSqrt,weightFactor,clusterId,clusterSize,merging,height)
+        rv<-mhclust_Rimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
     } else {
         if (verb) cat('using C implementation\n')
-        rv<-mhclust_Cimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,detsSqrt,weightFactor,clusterId,clusterSize,merging,height)
+        rv<-mhclust_Cimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
     }
 
     if (verb>2) cat('rv$merge pre tx\n')

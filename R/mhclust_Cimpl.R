@@ -7,7 +7,7 @@ mhclust_c<-function(X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingC
 }
 
 mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
-    .nFull,.nLeft,.distX,.centroid,.members,.invcov,.detsSqrt,.weightFactor,.clusterId,.clusterSize,.merging,.height) {
+    .nFull,.nLeft,.distX,.centroid,.members,.invcov,.invcovNmf,.weightFactor,.clusterId,.clusterSize,.merging,.height) {
 
     if (verb>2) {
         printWithName(.nFull)
@@ -19,7 +19,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
         is.null(.centroid),
         is.null(.members),
         is.null(.invcov),
-        is.null(.detsSqrt),
+        is.null(.invcovNmf),
         is.null(.weightFactor),
         is.null(.clusterId),
         is.null(.clusterSize),
@@ -32,7 +32,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
             printWithName(.centroid)
             printWithName(.members)
             printWithName(.invcov)
-            printWithName(.detsSqrt)
+            printWithName(.invcovNmf)
             printWithName(.weightFactor)
             printWithName(.clusterId)
             printWithName(.clusterSize)
@@ -44,7 +44,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
         stopifnot(.nLeft==nrow(.centroid))
         stopifnot(.nLeft==length(.members))
         stopifnot(.nLeft==length(.invcov))
-        stopifnot(.nLeft==length(.detsSqrt))
+        stopifnot(.nLeft==length(.invcovNmf))
         stopifnot(.nLeft==length(.weightFactor))
         stopifnot(.nLeft==length(.clusterId))
         stopifnot(.nLeft==length(.clusterSize))
@@ -83,7 +83,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
         .membersPoolSize<-NULL
     }
     mhclust_c(x,d,merge,height,thresh,quick,normalize,as.integer(g),as.integer(gMergingCount),as.integer(verb),
-        .nFull,.nLeft,.centroid,.members,.invcov,.detsSqrt,.weightFactor,.clusterId,.clusterSize,.membersPoolSize)
+        .nFull,.nLeft,.centroid,.members,.invcov,.invcovNmf,.weightFactor,.clusterId,.clusterSize,.membersPoolSize)
 
     return(list(merge=merge,height=height))
 }

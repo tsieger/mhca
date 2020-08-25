@@ -524,12 +524,12 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
  *       the cluster shape and size will affect inter-cluster distance.
  *  Verb - level of verbosity, the greater the more detailed info,
  *      defaults to 0 (no info)
- * _NFull, _NLeft, _Centroid, _Members, _Invcov, _DetsSqrt,
+ * _NFull, _NLeft, _Centroid, _Members, _Invcov, _InvcovNmf,
  * _WeightFactor, _ClusterId, _Height are internal parameters used when
  *      clustering pre-clustered apriori clusters)
  */
 SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP Verb,
-              SEXP _NFull,SEXP _NLeft,SEXP _Centroid,SEXP _Members,SEXP _Invcov,SEXP _DetsSqrt,SEXP _WeightFactor,
+              SEXP _NFull,SEXP _NLeft,SEXP _Centroid,SEXP _Members,SEXP _Invcov,SEXP _InvcovNmf,SEXP _WeightFactor,
               SEXP _ClusterId,SEXP _ClusterSize,SEXP _MembersPoolSize) {
     int dbg;
     int quick;
@@ -569,8 +569,8 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     Num *clusterSize; // the size of clusters
     Num *clusterId; // id of cluster contained in this specific position
-    double detSqrt;
-    double* detsSqrt; // square root of determinants of inverse covariance matrices
+    double icNmf;
+    double* invcovNmf; // normalization multiplicative factors making 'invcov' to have unit volume
 
     double *weightFactor,wf1; // factors weighting inverse covariance matrix against fakeInvCov
 
@@ -623,7 +623,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         IS_R_NULL(_Centroid),
         IS_R_NULL(_Members),
         IS_R_NULL(_Invcov),
-        IS_R_NULL(_DetsSqrt),
+        IS_R_NULL(_InvcovNmf),
         IS_R_NULL(_WeightFactor),
         IS_R_NULL(_ClusterId),
         IS_R_NULL(_ClusterSize),
@@ -637,7 +637,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     ASSERT(allOptPresent || allOptMissing,"invalid internal parameters");
     Num _nLeft=0L;
     double *_centroid=NULL;
-    double *_detsSqrt=NULL;
+    double *_invcovNmf=NULL;
     double *_weightFactor=NULL;
     Num *_clusterId=NULL;
     Num *_clusterSize=NULL;
@@ -645,7 +645,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     if (allOptPresent) {
         _nLeft=*INTEGER(_NLeft);
         _centroid=REAL(_Centroid);
-        _detsSqrt=REAL(_DetsSqrt);
+        _invcovNmf=REAL(_InvcovNmf);
         _weightFactor=REAL(_WeightFactor);
         _clusterId=INTEGER(_ClusterId);
         _clusterSize=INTEGER(_ClusterSize);
@@ -836,12 +836,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     // e.g. like ic1_11,ic1_21,ic1_12,ic1_22, ic2_11,ic2_21,ic2_12,ic2_22.
     // Normalizing factor for each cluster (computed from determinant of
     // the inverse of the covariance matrix) making the N-dim volume of
-    // clusters equal to 1 if `invcov[[i]]' gets divided by `detsSqrt[i]'.
-    detsSqrt=(double*)MEM_ALLOC(clusterCount,sizeof(double));
-    if (!IS_R_NULL(_DetsSqrt)) {
-        for (i=0;i<clusterCount;i++) detsSqrt[i]=_detsSqrt[i];
+    // clusters equal to 1 if `invcov[[i]]' gets divided by `invcovNmf[i]'.
+    invcovNmf=(double*)MEM_ALLOC(clusterCount,sizeof(double));
+    if (!IS_R_NULL(_InvcovNmf)) {
+        for (i=0;i<clusterCount;i++) invcovNmf[i]=_invcovNmf[i];
     } else {
-        for (i=0;i<clusterCount;i++) detsSqrt[i]=1.0;
+        for (i=0;i<clusterCount;i++) invcovNmf[i]=1.0;
     }
 
     // centroids of clusters
@@ -896,9 +896,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBGU("invcov[%d]: \n",i);
                 printDoubleMatrix("invcov",invcov+i*p*p,p,p);
             }
-            //printDoubleMatrix("detsSqrt",detsSqrt,1,clusterCount);
+            //printDoubleMatrix("invcovNmf",invcovNmf,1,clusterCount);
             for (i=0;i<clusterCount;i++) {
-                DBGU("detsSqrt[%d]: %g\n",C2R(i),detsSqrt[i]);
+                DBGU("invcovNmf[%d]: %g\n",C2R(i),invcovNmf[i]);
             }
             printDoubleMatrix("centroid",centroid,clusterCount,p);
             for (i=0;i<clusterCount;i++) {
@@ -1076,14 +1076,14 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
         if (info==0) {
             double *cholDecomp=covXij;
-            //R: detSqrt<-(1/prod(diag(c.cholDecomp)))^(2/p)
-            detSqrt=1.0;
+            //R: icNmf<-(1/prod(diag(c.cholDecomp)))^(2/p)
+            icNmf=1.0;
             for (offset=i=0;i<p;i++) {
-                // detSqrt*=cholDecomp[(p+1)*i];
-                detSqrt*=cholDecomp[offset];
+                // icNmf*=cholDecomp[(p+1)*i];
+                icNmf*=cholDecomp[offset];
                 offset+=p+1;
             }
-            detSqrt=pow(detSqrt,-2.0/p);
+            icNmf=pow(icNmf,-2.0/p);
             //R: invcov_merged<-chol2inv(c.cholDecomp)
             F77_CALL(dpotri)("L",// Lower diagonal is used
                              &p,covXij,&p,&info);
@@ -1100,12 +1100,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 }
             });
         } else {
-            detSqrt=1.0;
+            icNmf=1.0;
             memcpy(invcovMerged,fakeInvCov,sizeof(*fakeInvCov)*p*p);
         }
 
         DBG_CODE(3,{
-            printDoubleMatrix("detSqrt",&detSqrt,1,1);
+            printDoubleMatrix("icNmf",&icNmf,1,1);
             printDoubleMatrix("invcovMerged",invcovMerged,p,p);
         });
         // compute a new center of the merged cluster
@@ -1144,14 +1144,14 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             double minNewDistX=0,tmp;
 
             //R: ic1<-invcovMerged
-            //R: detSqrtIc1<-detSqrt
+            //R: icNmf1<-icNmf
             memcpy(ic1,invcovMerged,sizeof(*invcovMerged)*p*p);
             DBG_CODE(3,printDoubleMatrix("ic1",ic1,p,p));
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                     normalize,fullMahalClusterCount,clusterCount);
                 for (i=0;i<p*p;i++) {
-                    ic1[i]/=detSqrt;
+                    ic1[i]/=icNmf;
                 }
                 DBG_CODE(3,printDoubleMatrix("normalized ic1",ic1,p,p));
             }
@@ -1288,9 +1288,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
                         DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                             normalize,fullMahalClusterCount,clusterCount);
-                        double detSqrt2=detsSqrt[otherCluster];
+                        double icNmf2=invcovNmf[otherCluster];
                         for (i=0;i<p*p;i++) {
-                            ic2[i]/=detSqrt2;
+                            ic2[i]/=icNmf2;
                         }
                         DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
                     }
@@ -1359,10 +1359,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         memmove(invcov+p*p*c2,invcov+p*p*(c2+1),sizeof(*invcov)*p*p*(clusterCount-1-c2));
         //R: invcov[[c1]]<-invcov_merged
         memcpy(invcov+c1*p*p,invcovMerged,sizeof(*invcov)*p*p);
-        //R: detsSqrt<-detsSqrt[-c2]
-        memmove(detsSqrt+c2,detsSqrt+c2+1,sizeof(*detsSqrt)*(clusterCount-1-c2));
-        //R: detsSqrt[i]<-detSqrt
-        detsSqrt[c1]=detSqrt;
+        //R: invcovNmf<-invcovNmf[-c2]
+        memmove(invcovNmf+c2,invcovNmf+c2+1,sizeof(*invcovNmf)*(clusterCount-1-c2));
+        //R: invcovNmf[i]<-icNmf
+        invcovNmf[c1]=icNmf;
         //R: centroid<-centroid[-c2,]
         for (i=0;i<p-1;i++) memmove(centroid+c2+i*(clusterCount-1),centroid+c2+i*clusterCount+1,sizeof(*centroid)*(clusterCount-1));
         memmove(centroid+c2+(p-1)*(clusterCount-1),centroid+c2+(p-1)*clusterCount+1,sizeof(*centroid)*(clusterCount-1-c2));
@@ -1506,9 +1506,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG_CODE(3,printDoubleMatrix("ic2",ic2,p,p));
                 if (normalize) {
                     DBG(3," normalizing ic2\n");
-                    detSqrt=detsSqrt[i1];
+                    icNmf=invcovNmf[i1];
                     for (i=0;i<p*p;i++) {
-                        ic2[i]/=detSqrt;
+                        ic2[i]/=icNmf;
                     }
                     DBG_CODE(3,printDoubleMatrix("normalized ic2",ic2,p,p));
                 }
@@ -1524,9 +1524,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     DBG_CODE(3,printDoubleMatrix("ic1",ic1,p,p));
                     if (normalize) {
                         DBG(3," normalizing ic1\n");
-                        detSqrt=detsSqrt[i2];
+                        icNmf=invcovNmf[i2];
                         for (i=0;i<p*p;i++) {
-                            ic1[i]/=detSqrt;
+                            ic1[i]/=icNmf;
                         }
                         DBG_CODE(3,printDoubleMatrix("normalized ic1",ic1,p,p));
                     }
@@ -1587,7 +1587,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     MEM_FREE(distMahaBuf);
     MEM_FREE(invcov);
     MEM_FREE(invcovMerged);
-    MEM_FREE(detsSqrt);
+    MEM_FREE(invcovNmf);
     MEM_FREE(centroid);
     MEM_FREE(xc1);
     MEM_FREE(xc2);

@@ -91,7 +91,7 @@ verb, ##<< level of verbosity, the greater the more detailed
 .invcov = NULL, ##<< inverse of the covariance matrices of the current
 ## clusters/observations to cluster (internal parameter used when
 ## clustering pre-clustered apriori clusters)
-.detsSqrt = NULL, ##<< normalization constants of the inverse of the
+.invcovNmf = NULL, ##<< normalization constants of the inverse of the
 ## covariance matrices (internal parameter used when clustering
 ## pre-clustered apriori clusters)
 .weightFactor = NULL, ##<< weight factors of the current
@@ -121,7 +121,7 @@ verb, ##<< level of verbosity, the greater the more detailed
         is.null(.centroid),
         is.null(.members),
         is.null(.invcov),
-        is.null(.detsSqrt),
+        is.null(.invcovNmf),
         is.null(.weightFactor),
         is.null(.clusterId),
         is.null(.clusterSize),
@@ -134,7 +134,7 @@ verb, ##<< level of verbosity, the greater the more detailed
             printWithName(.centroid)
             printWithName(.members)
             printWithName(.invcov)
-            printWithName(.detsSqrt)
+            printWithName(.invcovNmf)
             printWithName(.weightFactor)
             printWithName(.clusterId)
             printWithName(.clusterSize)
@@ -146,7 +146,7 @@ verb, ##<< level of verbosity, the greater the more detailed
         stopifnot(.nLeft==nrow(.centroid))
         stopifnot(.nLeft==length(.members))
         stopifnot(.nLeft==length(.invcov))
-        stopifnot(.nLeft==length(.detsSqrt))
+        stopifnot(.nLeft==length(.invcovNmf))
         stopifnot(.nLeft==length(.weightFactor))
         stopifnot(.nLeft==length(.clusterId))
         stopifnot(.nLeft==length(.clusterSize))
@@ -245,11 +245,11 @@ verb, ##<< level of verbosity, the greater the more detailed
     }
     # normalizing factor for each cluster (computed from determinant of
     # the inverse of the covariance matrix) making the N-dim volume of
-    # clusters equal to 1 if `invcov[[i]]' gets divided by `detsSqrt[i]'
-    if (!is.null(.detsSqrt)) {
-        detsSqrt<-.detsSqrt
+    # clusters equal to 1 if `invcov[[i]]' gets divided by `invcovNmf[i]'
+    if (!is.null(.invcovNmf)) {
+        invcovNmf<-.invcovNmf
     } else {
-        detsSqrt<-rep(1,clusterCount)
+        invcovNmf<-rep(1,clusterCount)
     }
     # centroids of cluster
     if (!is.null(.centroid)) {
@@ -281,8 +281,8 @@ verb, ##<< level of verbosity, the greater the more detailed
             cat(sprintf('\n====================== step %d ============================\n',s-1))
             printMembers(members)
             printWithName(invcov)
-            #printWithName(detsSqrt)
-            printVectorMembers(detsSqrt)
+            #printWithName(invcovNmf)
+            printVectorMembers(invcovNmf)
             printWithName(centroid)
             printVectorMembers(weightFactor)
             printWithName(clusterCount)
@@ -367,8 +367,8 @@ verb, ##<< level of verbosity, the greater the more detailed
         # try to compute Cholesky decomposition of the covariance matrix
         # if it fails, fall back to the unit matrix
         c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
-        detSqrt<-(1/prod(diag(c.cholDecomp)))^(2/spaceDim)
-        if (dbg>3) printWithName(detSqrt)
+        icNmf<-(1/prod(diag(c.cholDecomp)))^(2/spaceDim)
+        if (dbg>3) printWithName(icNmf)
         invcov_merged<-chol2inv(c.cholDecomp)
 
         if (dbg>2) printWithName(invcov_merged)
@@ -385,11 +385,11 @@ verb, ##<< level of verbosity, the greater the more detailed
           pointCount-(clusterCount-1) < gMergingCount) { # we've not clustered all the samples in the apriori clusters
           # ( pointCount-(clusterCount-1) is the number of samples clustered so far)
             ic1<-invcov_merged
-            detSqrtIc1<-detSqrt
+            icNmf1<-icNmf
             if (dbg>2) printWithName(ic1)
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 if (dbg>2) cat(sprintf(' normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n',normalize,fullMahalClusterCount,clusterCount))
-                ic1<-ic1 / detSqrtIc1
+                ic1<-ic1 / icNmf1
                 if (dbg>2) printWithName(ic1)
             }
             for (ii in seq(along=otherClusters)) {
@@ -442,7 +442,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                     ic2<-invcov[[otherClusters[ii]]]
                     if (dbg>3) printWithName(ic2)
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
-                        ic2<-ic2 / detsSqrt[otherClusters[ii]]
+                        ic2<-ic2 / invcovNmf[otherClusters[ii]]
                         if (dbg>3) printWithName(ic2)
                     }
                     # mean Mahalanobis distance
@@ -463,8 +463,8 @@ verb, ##<< level of verbosity, the greater the more detailed
         members<-members[-j]
         invcov<-invcov[-j]
         invcov[[i]]<-invcov_merged
-        detsSqrt<-detsSqrt[-j]
-        detsSqrt[i]<-detSqrt
+        invcovNmf<-invcovNmf[-j]
+        invcovNmf[i]<-icNmf
         centroid<-centroid[-j,]
         weightFactor<-weightFactor[-j]
         jRelDistXIdx<-c(otherClusters1*(clusterCount-(otherClusters1+1)/2)-clusterCount+j,
@@ -500,7 +500,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                 ic2<-invcov[[i1]]
                 if (dbg>2) printWithName(ic2)
                 if (normalize) {
-                    ic2<-ic2 / detsSqrt[i1]
+                    ic2<-ic2 / invcovNmf[i1]
                     if (dbg>2) printWithName(ic2)
                 }
 
@@ -513,7 +513,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                     ic1<-invcov[[i2]]
                     if (dbg>2) printWithName(ic1)
                     if (normalize) {
-                        ic1<-ic1 / detsSqrt[i2]
+                        ic1<-ic1 / invcovNmf[i2]
                         if (dbg>2) printWithName(ic1)
                     }
                     # mean Mahalanobis distance
