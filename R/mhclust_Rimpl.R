@@ -302,13 +302,22 @@ verb, ##<< level of verbosity, the greater the more detailed
         if (dbg>3) cat(sprintf('found minimum %g at %d\n',v,k))
 
         # (i,j) @ k = n*(i-1) - i*(i-1)/2 + j-i
-        # k = -i^2 + i*(n+1/2-1) -n+j
-        # 0 = -i^2 + i*(n-1/2) -n+j-k
-        # 0 = i^2 - i*(n-1/2) + n+k-j
-        # D = (n-1/2)^2 - 4*(n+k-j) = n^2-n+1/4 -4*n-4*k+4*j = n^2-5*n + 4*j-4*k+1/4
-        #  n>=j>i => j=n-j0
-        # D = n^2-5*n + 4*(i+j0)-4*k+1/4 = n^2
-        #TODO
+        # k = -(i^2)/2 + i*(n+1/2-1) -n+j
+        # 0 = -(i^2)/2 + i*(n-1/2) -n+j-k
+        # 0 = (i^2)/2 - i*(n-1/2) + n+k-j          {1}
+        #  now try to substitute "i" for "j" to make the equation {1} to contain "i" only:
+        # j = i+1+j0, j0>=0
+        # 0 = (i^2)/2 - i*(n-1/2) + n+k-(i+1+j0)
+        # 0 = (i^2)/2 - i*(n-1/2+1) + n+k-(1+j0)
+        # 0 = (i^2)/2 - i*(n+1/2) + n+k-1-j0       {2}
+        # D = (n+1/2)^2 - 4*(n+k-1-j0)/2 = (n-1/2)^2-2*(k-1-j0) >= (n-1/2)^2-2*(k-1) as j0>=0
+        #  now solve the equation {2} for "i":
+        # i = floor( (n+1/2) - sqrt((n-1/2)^2-2*(k-1)) )
+        #  and compute j from {1}:
+        # j = (i^2)/2 - i*(n-1/2) + n+k
+        #   = k-i*(n-1/2-i/2)+n
+        #   = k-i*(n-i/2)+i/2+n
+        #   = k-(i-1)*(n-i/2)+i
 
         # we are merging clusters `i' and `j' into a new one
         i<-as.integer(floor(clusterCount+1/2-sqrt(clusterCount^2-clusterCount+1/4-2*(k-1))))
