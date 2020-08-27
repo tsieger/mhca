@@ -1,5 +1,5 @@
 # Compute a matrix of between-cluster Mahalanobis distances.
-computeMahalDistMat<-function(distX=NULL,clusterCount,x,centroid,members,invcov,detsSqrt,normalize,quick,dbg) {
+computeMahalDistMat<-function(distX=NULL,clusterCount,x,centroid,members,invcov,invcovNmf,normalize,quick,dbg) {
     if (is.null(distX)) {
         distX<-rep(0,1,clusterCount*(clusterCount-1)/2)
     }
@@ -15,7 +15,7 @@ computeMahalDistMat<-function(distX=NULL,clusterCount,x,centroid,members,invcov,
         ic2<-invcov[[i1]]
         if (dbg>2) printWithName(ic2)
         if (normalize) {
-            ic2<-ic2 / detsSqrt[i1]
+            ic2<-ic2 / invcovNmf[i1]
             if (dbg>2) printWithName(ic2)
         }
 
@@ -28,7 +28,7 @@ computeMahalDistMat<-function(distX=NULL,clusterCount,x,centroid,members,invcov,
             ic1<-invcov[[i2]]
             if (dbg>2) printWithName(ic1)
             if (normalize) {
-                ic1<-ic1 / detsSqrt[i2]
+                ic1<-ic1 / invcovNmf[i2]
                 if (dbg>2) printWithName(ic1)
             }
             # mean Mahalanobis distance
