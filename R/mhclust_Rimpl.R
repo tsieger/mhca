@@ -70,6 +70,40 @@ g, ##<< Optional assignment of samples to apriori clusters that
 gMergingCount, ##<< number of merging operations to be performed when
 ## forming the apriori clusters (this is directly computed from `g' and
 ## appears here only to eliminate code duplication).
+subthreshHandling = c('mahal','mahal0','euclid','euclidMahal'), ##<< method
+## how subthreshold clusters distort the space around them - i.e. how
+## their size and shape gets reflected in distance computation.
+## The idea is that subthreshold clusters should not use the
+## fully-blown Mahalanobis distance, as they are too small to reliably
+## estimate the covariance matrix for them. However, resigning to pure
+## Euclidean distance for subthreshold clusters could be too harsh.
+##
+## The \code{mahal} method pushes the covariance matrices of small
+## clusters towards a sphere, such that those clusters do not distort
+## the space around them too much.
+##
+## The \code{mahal0} method is similar to \code{mahal}, but it
+## somehow ignores the scale of data contained subthreshold clusters,
+## which can lead to spurious results for clusters of data living on
+## too large / small scales. This option is mostly present only for
+## backward compatibility.
+##
+## The \code{euclidMahal} method enforces spherical (unit) covariances
+## of all subthreshold clusters (i.e. Euclidean distances are used to
+## compute distances from them), but clusters above the threshold use
+## the Mahalanobis distance, eventhough there still could exist
+## subthreshold clusters using the Euclidean distance. This disparity
+## could demonstrate in merging large super-threshold elliptical
+## clusters before subthreshold clusters form another super-threshold
+## cluster, which could be deemed non-intuitive.
+##
+## The \code{euclid} method enforces spherical covariances of all
+## clusters until there are not any subthreshold clusters. This option
+## usually leads to formation of compact superthreshold clusters, but
+## completely ignores the possible internal elliptical structure of
+## subthreshold clusters.
+##
+## See subthreshX demos to learn more.
 verb, ##<< level of verbosity, the greater the more detailed
 ## info, defaults to 0 (no info).
 .nFull = NULL, ##<< number of observations; this equals
@@ -227,7 +261,7 @@ verb, ##<< level of verbosity, the greater the more detailed
 
     # if inverse of covariance matrix can't be computed, use
     # this surrogate
-    fakeInvCov<-diag(spaceDim)
+    fakeCov<-fakeInvCov<-diag(spaceDim)
 
     # members (elementary observations) of each cluster
     if (!is.null(.members)) {
@@ -356,6 +390,16 @@ verb, ##<< level of verbosity, the greater the more detailed
         } else {
             wf1<-0
         }
+        # if the cluster being born consists of two samples only, don't try to compute
+        # its covariance matrix, but use the spherical covariance matrix instead
+        if (clusterSize[i] + clusterSize[j]==2) {
+            wf1<-0
+            covXij<-fakeCov
+        } else {
+            # try to fit an ellipsoid to the merged cluster - try to
+            # compute the inverse of covariance matrix
+            covXij<-cov(xij)
+        }
         # update fullMahalClusterCount if necessary
         if (wf1==1) {
             if (weightFactor[i] + weightFactor[j] == 2) fullMahalClusterCount<-fullMahalClusterCount - 1
@@ -364,23 +408,51 @@ verb, ##<< level of verbosity, the greater the more detailed
         weightFactor[i]<-wf1
         if (dbg>1) printWithName(wf1)
 
-        # try to fit an ellipsoid to the merged cluster - try to
-        # compute the inverse of covariance matrix
-        covXij<-cov(xij)
-        if (dbg>1) printWithName(xij)
+        if (dbg>2) printWithName(xij)
         if (dbg>1) printWithName(covXij)
-        # if the cluster consists of few members only, do not take its shape too serious:
-        # round it somehow (make closer to circle) by weighting
-        covXij<-wf1 * covXij + (1-wf1) * fakeInvCov
-        if (dbg>1) printWithName(covXij)
-        # try to compute Cholesky decomposition of the covariance matrix
-        # if it fails, fall back to the unit matrix
-        c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
-        icNmf<-(1/prod(diag(c.cholDecomp)))^(2/spaceDim)
-        if (dbg>3) printWithName(icNmf)
-        invcov_merged<-chol2inv(c.cholDecomp)
+        # if the cluster consists of few members only, its shape should
+        # not be took too serious: the covariance could be made closer
+        # to circle, or even replaced by spherical covariance
+        if (subthreshHandling=='mahal' || subthreshHandling=='mahal0' ||
+            (subthreshHandling=='euclid' || subthreshHandling=='euclidMahal') && wf1==1) { # the condition is verbose, but error-prone
+            # shift the covariance towards a sphere
 
-        if (dbg>2) printWithName(invcov_merged)
+            # determine scaling factor
+            if (subthreshHandling=='mahal0') {
+                # NOTE: this is NOT scale-independent, i.e. this affects covXij with large elements
+                # much less than covXij with small elements!
+                mf<-1
+            } else {
+                # scale the unit covariance matrix by the determinant
+                # of the empirical covariance matrix
+                mf<-det(covXij)^(1/spaceDim)
+            }
+            if (dbg>2) printWithName(mf)
+            # scale the covariance
+            covXij<-wf1 * covXij + (1-wf1) * mf * fakeInvCov
+            if (dbg>2) printWithName(covXij)
+
+            # try to compute the Cholesky decomposition of the covariance matrix
+            # if it fails, fall back to the unit matrix
+            c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
+            invcov_merged<-chol2inv(c.cholDecomp)
+            if (dbg>2) printWithName(invcov_merged)
+
+            # normalization factor is given by the spaceDim-th root of
+            # the determinant of the inverse of the covariance matrix,
+            # which is the inverse of the determinant of the covariance matrix,
+            # which is the square of the product of diagonal entries of its
+            # Cholesky decomposition
+            icNmf<-(1/prod(diag(c.cholDecomp)))^(2/spaceDim)
+            if (dbg>2) printWithName(icNmf)
+        } else {
+            # force the covariance matrix to be the unit matrix
+            invcov_merged<-fakeInvCov
+            if (dbg>2) printWithName(invcov_merged)
+            icNmf<-1
+            if (dbg>2) printWithName(icNmf)
+        }
+
         # compute a new center of the merged cluster
         centroid[i,]<-(clusterSize[i]*centroid[i,,drop=FALSE] + clusterSize[j]*centroid[j,,drop=FALSE])/
             (clusterSize[i] + clusterSize[j])
@@ -398,7 +470,13 @@ verb, ##<< level of verbosity, the greater the more detailed
             if (dbg>2) printWithName(ic1)
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 if (dbg>2) cat(sprintf(' normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n',normalize,fullMahalClusterCount,clusterCount))
-                ic1<-ic1 / icNmf1
+                if (subthreshHandling=='euclid') {
+                    # enforce unit covariance even if this cluster is large enough,
+                    # but some of the others are not
+                    ic1<-fakeInvCov
+                } else {
+                    ic1<-ic1 / icNmf1
+                }
                 if (dbg>2) printWithName(ic1)
             }
             for (ii in seq(along=otherClusters)) {
@@ -451,7 +529,13 @@ verb, ##<< level of verbosity, the greater the more detailed
                     ic2<-invcov[[otherClusters[ii]]]
                     if (dbg>3) printWithName(ic2)
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
-                        ic2<-ic2 / invcovNmf[otherClusters[ii]]
+                        if (subthreshHandling=='euclid') {
+                            # enforce unit covariance even if this cluster is large enough,
+                            # but some of the others are not
+                            ic2<-fakeInvCov
+                        } else {
+                            ic2<-ic2 / invcovNmf[otherClusters[ii]]
+                        }
                         if (dbg>3) printWithName(ic2)
                     }
                     # mean Mahalanobis distance

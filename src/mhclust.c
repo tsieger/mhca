@@ -65,6 +65,11 @@ char *strBuf=NULL; // a long buffer (to hold a sequence of `O(n^2)' real numbers
 char *strBufShort=NULL; // a short buffer (to hold a sequence of `O(n)' integers)
 char *strBufShort2=NULL; // a short buffer (to hold a sequence of `O(n)' integers)
 
+#define SUBTHRESHOLD_METHOD_MAHAL 0
+#define SUBTHRESHOLD_METHOD_MAHAL0 1
+#define SUBTHRESHOLD_METHOD_EUCLID 2
+#define SUBTHRESHOLD_METHOD_EUCLID_MAHAL 3
+
 #ifdef ENABLE_DEBUGS
 /*
  * Get members of a cluster, a sequence of string form of IDs of observations.
@@ -528,7 +533,7 @@ Num constructBetweenClusterDistanceMatrix(double *x,Num n,Num p,
  * _WeightFactor, _ClusterId, _Height are internal parameters used when
  *      clustering pre-clustered apriori clusters)
  */
-SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP Verb,
+SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,SEXP Normalize,SEXP G,SEXP GMergingCount,SEXP SubthreshHandlingId,SEXP Verb,
               SEXP _NFull,SEXP _NLeft,SEXP _Centroid,SEXP _Members,SEXP _Invcov,SEXP _InvcovNmf,SEXP _WeightFactor,
               SEXP _ClusterId,SEXP _ClusterSize,SEXP _MembersPoolSize) {
     int dbg;
@@ -549,8 +554,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     double *xc1,*xc2; // data of clusters
 
     double *covXij; // cov of xij
+    double *covXijCholDecomp; // copy of covXij
     Num covXijLength;
     double *invcov,*invcovMerged,*fakeInvCov; // inverse covariance matrices
+    double *fakeCov; // fallback covariance matrix
     double *ic1,*ic2; // inverse covariance matrices
     double *covMeansTmp; // temporary storage for means of x during computation of cov
 
@@ -564,6 +571,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     double thresh;
     int normalize;
+    int subthreshHandlingId;
 
     Num *g,gMergingCount;
 
@@ -676,6 +684,9 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     DBG(2,"g: %p\n",g);
     gMergingCount=*INTEGER(GMergingCount);
     DBG(2,"gMergingCount: %d\n",gMergingCount);
+
+    subthreshHandlingId=*INTEGER(SubthreshHandlingId);
+    DBG(2,"subthreshHandlingId: %d\n",subthreshHandlingId);
 
     n=dimX[0]; // number of elementary points subject to clustering (merging)
     DBG(2,"n: %d\n",n);
@@ -795,14 +806,17 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
     xij=(double *)MEM_ALLOC(n*p,sizeof(double));
     covXij=(double *)MEM_ALLOC(covXijLength,sizeof(double));
+    covXijCholDecomp=(double *)MEM_ALLOC(covXijLength,sizeof(double));
+    // if inverse of covariance matrix can't be computed, use
+    // this surrogate
+    //R: fakeInvCov<-diag(p)
     fakeInvCov=(double *)MEM_ALLOC(p*p,sizeof(double));
     memset(fakeInvCov,0,p*p*sizeof(double));
     for (i=0;i<p;i++) {
         fakeInvCov[(p+1)*i]=1;
     }
-    // if inverse of covariance matrix can't be computed, use
-    // this surrogate
-    //R: fakeInvCov<-diag(p)
+    fakeCov=fakeInvCov; // both fakeCov and fakeInvCov are unit matrices,
+    // the names fakeCov and fakeInvCov serve just as intuitive aliases
     DBG_CODE(3,printDoubleMatrix("fakeInvCov",fakeInvCov,p,p));
     ic1=(double *)MEM_ALLOC(p*p,sizeof(double));
     ic2=(double *)MEM_ALLOC(p*p,sizeof(double));
@@ -1044,6 +1058,16 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         } else {
             wf1=0;
         }
+        // if the cluster being born consists of two samples only, don't try to compute
+        // its covariance matrix, but use the spherical covariance matrix instead
+        if (clusterSize[c1] + clusterSize[c2] == 2) {
+            wf1=0;
+            memcpy(covXij,fakeCov,sizeof(*covXij)*p*p);
+        } else {
+            // try to fit an ellipsoid to the merged cluster - try to
+            // compute the inverse of covariance matrix
+            cov(xij,xijN,p,covXij,covMeansTmp);
+        }
         // update fullMahalClusterCount if necessary
         if (wf1==1) {
             if (weightFactor[c1] + weightFactor[c2] == 2) {
@@ -1054,54 +1078,92 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         }
         weightFactor[c1]=wf1;
         DBG(2,"wf1: %g\n",wf1);
-        // try to fit an ellipsoid to the merged cluster - try to
-        // compute the inverse of covariance matrix
-        cov(xij,xijN,p,covXij,covMeansTmp);
         DBG_CODE(2,printDoubleMatrix("covXij",covXij,p,p));
-        // if the cluster consists of few members only, do not take its shape too serious:
-        // round it somehow (make closer to circle) by weighting
-        if (wf1<1) {
-            for (i=0;i<covXijLength;i++) {
-                covXij[i] = wf1 * covXij[i] + (1 - wf1) * fakeInvCov[i];
+        // if the cluster consists of few members only, its shape should
+        // not be took too serious: the covariance could be made closer
+        // to circle, or even replaced by spherical covariance
+        if (subthreshHandlingId==SUBTHRESHOLD_METHOD_MAHAL || subthreshHandlingId==SUBTHRESHOLD_METHOD_MAHAL0 ||
+            (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID || subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID_MAHAL) && wf1==1) {
+            // the condition is verbose, but error-prone
+
+            // shift the covariance towards a sphere
+            // determine scaling factor
+            double mf;
+            if (subthreshHandlingId==SUBTHRESHOLD_METHOD_MAHAL0) {
+                // NOTE: this is NOT scale-independent, i.e. this affects covXij with large elements
+                // much less than covXij with small elements!
+                mf=1.0;
+            } else {
+                // scale the unit covariance matrix by the determinant
+                // of the empirical covariance matrix
+                //R: mf<-det(covXij)^(1/spaceDim)
+                memcpy(covXijCholDecomp,covXij,sizeof(*covXij)*p*p);
+                F77_CALL(dpotrf)("L",// Lower diagonal is used
+                                 &p,covXijCholDecomp,&p,&info);
+                DBG(4,"info: %d\n",info);
+                ASSERT(info>=0,"invalid dpotrf retcode");
+                DBG_CODE(4,printDoubleMatrix("L",covXijCholDecomp,p,p));
+                if (info==0) {
+                    mf=1.0;
+                    for (offset=i=0;i<p;i++) {
+                        mf*=covXijCholDecomp[offset];
+                        offset+=p+1;
+                    }
+                    mf=pow(mf,2/p);
+                } else {
+                    // fallback
+                    mf=1.0;
+                }
             }
-        }
-        DBG_CODE(2,printDoubleMatrix("updated covXij",covXij,p,p));
-        // try to compute Cholesky decomposition of the covariance matrix
-        // if it fails, fall back to the unit matrix
-        //R: c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
-        F77_CALL(dpotrf)("L",// Lower diagonal is used
-                         &p,covXij,&p,&info);
-        DBG(4,"info: %d\n",info);
-        ASSERT(info>=0,"invalid dpotrf retcode");
-        DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
-        if (info==0) {
-            double *cholDecomp=covXij;
-            //R: icNmf<-(1/prod(diag(c.cholDecomp)))^(2/p)
-            icNmf=1.0;
-            for (offset=i=0;i<p;i++) {
-                // icNmf*=cholDecomp[(p+1)*i];
-                icNmf*=cholDecomp[offset];
-                offset+=p+1;
+            DBG(2,"mf: %g\n",mf);
+            if (wf1<1) {
+                for (i=0;i<covXijLength;i++) {
+                    covXij[i] = wf1 * covXij[i] + (1 - wf1) * mf * fakeInvCov[i];
+                }
             }
-            icNmf=pow(icNmf,-2.0/p);
-            //R: invcov_merged<-chol2inv(c.cholDecomp)
-            F77_CALL(dpotri)("L",// Lower diagonal is used
+            DBG_CODE(2,printDoubleMatrix("updated covXij",covXij,p,p));
+
+            // try to compute Cholesky decomposition of the covariance matrix
+            // if it fails, fall back to the unit matrix
+            //R: c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
+            F77_CALL(dpotrf)("L",// Lower diagonal is used
                              &p,covXij,&p,&info);
             DBG(4,"info: %d\n",info);
-            DBG_CODE(4,printDoubleMatrix("I",covXij,p,p));
-            memcpy(invcovMerged,covXij,sizeof(*covXij)*p*p);
-            // invcovMerged contains only lower triangular part (plus diagonal),
-            // so initialize also the upper diagonal for debugging purposes
-            DBG_CODE(3,{
-                for (i=0;i<p;i++) {
-                    for (j=i+1;j<p;j++) {
-                        invcovMerged[i+p*j]=invcovMerged[j+p*i];
-                    }
+            ASSERT(info>=0,"invalid dpotrf retcode");
+            DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
+            if (info==0) {
+                double *cholDecomp=covXij;
+                //R: icNmf<-(1/prod(diag(c.cholDecomp)))^(2/spaceDim)
+                icNmf=1.0;
+                for (offset=i=0;i<p;i++) {
+                    icNmf*=cholDecomp[offset];
+                    offset+=p+1;
                 }
-            });
+                icNmf=pow(icNmf,-2.0/p);
+
+                //R: invcov_merged<-chol2inv(c.cholDecomp)
+                F77_CALL(dpotri)("L",// Lower diagonal is used
+                                 &p,covXij,&p,&info);
+                DBG(4,"info: %d\n",info);
+                DBG_CODE(4,printDoubleMatrix("I",covXij,p,p));
+                memcpy(invcovMerged,covXij,sizeof(*covXij)*p*p);
+                // invcovMerged contains only lower triangular part (plus diagonal),
+                // so initialize also the upper diagonal for debugging purposes
+                DBG_CODE(3,{
+                    for (i=0;i<p;i++) {
+                        for (j=i+1;j<p;j++) {
+                            invcovMerged[i+p*j]=invcovMerged[j+p*i];
+                        }
+                    }
+                });
+            } else {
+                icNmf=1.0;
+                memcpy(invcovMerged,fakeInvCov,sizeof(*fakeInvCov)*p*p);
+            }
         } else {
-            icNmf=1.0;
+            // force the covariance matrix to be the unit matrix
             memcpy(invcovMerged,fakeInvCov,sizeof(*fakeInvCov)*p*p);
+            icNmf=1.0;
         }
 
         DBG_CODE(3,{
@@ -1150,8 +1212,12 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                     normalize,fullMahalClusterCount,clusterCount);
-                for (i=0;i<p*p;i++) {
-                    ic1[i]/=icNmf;
+                if (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
+                    memcpy(ic1,fakeInvCov,sizeof(*fakeInvCov)*p*p);
+                } else {
+                    for (i=0;i<p*p;i++) {
+                        ic1[i]/=icNmf;
+                    }
                 }
                 DBG_CODE(3,printDoubleMatrix("normalized ic1",ic1,p,p));
             }
@@ -1288,9 +1354,13 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
                         DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                             normalize,fullMahalClusterCount,clusterCount);
-                        double icNmf2=invcovNmf[otherCluster];
-                        for (i=0;i<p*p;i++) {
-                            ic2[i]/=icNmf2;
+                        if (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
+                            memcpy(ic2,fakeInvCov,sizeof(*fakeInvCov)*p*p);
+                        } else {
+                            double icNmf2=invcovNmf[otherCluster];
+                            for (i=0;i<p*p;i++) {
+                                ic2[i]/=icNmf2;
+                            }
                         }
                         DBG_CODE(4,printDoubleMatrix("normalized ic2",ic2,p,p));
                     }
@@ -1577,6 +1647,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
     MEM_FREE(clusterId);
     MEM_FREE(xij);
     MEM_FREE(covXij);
+    MEM_FREE(covXijCholDecomp);
     MEM_FREE(fakeInvCov);
     MEM_FREE(ic1);
     MEM_FREE(ic2);

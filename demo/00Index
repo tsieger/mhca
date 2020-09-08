@@ -3,3 +3,7 @@ aprioriNonIntra     Mahalanobis HCA with apriori clusters with ignorable interna
 big                 big data demo: using apriori clusters can save space and time
 bigger              Mahalanobis HCA with 1,000,000 observations in 1,000 apriori clusters
 parallel            Mahalanobis HCA with parallel clustering of apriori clusters
+subthresh1          Treatment of clusters with subthreshold size: three elongated clusters
+subthresh2          Treatment of clusters with subthreshold size: three elongated clusters in line
+subthresh3          Treatment of clusters with subthreshold size: one of subthreshold clusters consists of several subclusters
+subthresh4          Treatment of clusters with subthreshold size: a subthreshold cluster in between two larger ones

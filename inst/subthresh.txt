@@ -1,0 +1,111 @@
+This document attempts to explain the different 'subthreshHandling' methods of mhclust()
+
+
+## Intro
+
+The Mahalanobis distance heavily depends on the (inverse) covariance
+matrix defining the distortion of space around a cluster. For
+relatively large clusters, this matrix can be estimated quite
+precisely. However, for small clusters, the covariance matrix can't be
+estimated easily, which negatively affects the Mahalanobis distance
+computed with respect to such clusters. 
+
+Therefore, small clusters should be treated in a special way, which is
+controlled using the 'subthreshHandling' argument to mhclust(). This
+argument defines how  the size and shape of clusters that have not
+reached the desired cardinality limit (computed as 'thresh' * N,
+where 'thresh' is an argument to mhclust() and N is the total number of
+data samples) affect the distance measures. See the help for the
+'subthreshHandling' argument to learn details.
+
+Basically, when one is not interested in the structure of
+subthreshold clusters, they should use one of 'euclid' or
+'euclidMahal' methods, which, however, could yield non-intuitive
+results (se below). Generally, the 'mahal' method works
+quite well and is taken as the default.
+
+
+## Demo data
+
+To explore the different methods, we demonstrate possible methods of 
+'subthreshHandling' on several toy data sets in demos 'subthreshX.R'
+located in the 'demo/' directory.
+
+Here, we briefly make several observations how the particular
+methods of 'subthreshHandling' behave for some synthetic data. 
+See the subthreshX.png pictures and correspoding demos to learn
+details. Each data set consists of three clusters with possible
+internal structure. 
+
+The first two data sets consist of three clusters of 50 samples each.
+The threshold is set to 1/3, i.e. clusters of less than 50 samples
+are considered to be subthreshold. 
+
+The third data set consists of three clusters of 40 samples each. 
+The threshold is set to 1/3, i.e. clusters of less than 40 samples are
+considered to be subthreshold. 
+
+The fourth data set consists of three clusters: two are of 100 samples,
+one of 40 samples. The threshold is set to 100/240, i.e. clusters of
+less than 100 samples are considered to be subthreshold. 
+
+
+## Figures overview:
+
+Each figure presents a single toy data set on three 
+different scales (in rows) and processed by the four different methods 
+(columns). The figure consists of a panel of dot plots enriched with
+dendrograms. 
+
+Note that in Fig. 1, the 'euclid' method gives non-intuitive results
+(1G) since it ignores the shape of clusters until all clusters are of
+super-threshold size. In this particaulr case, the two black clusters
+get merged before the red an green clusters are, because the black
+clusters are closer in the euclidean distance sense.
+
+Note that in Fig. 2, the 'mahal0' method yields results which depend on
+the scale of data (2E vs. 2F) and that the 'euclidMahal' can yield
+non-intuitive results (2J) (because the two vlack clusters are
+effectively closer to each other compared to the red and green ones).
+
+Note that in Fig. 3, the internal structure of the subthreshold cluster
+(on the left side) is not appreciated by the 'euclid' and 'euclidMahal'
+methods, but it gets recognized by the 'mahal' method.
+
+Note that in Fig. 4, the central spherical cluster gets attracted
+towards the narrow cluster at the top when using (at least
+partially) the Mahalanobis distance, but it gets attracted to the
+cluster at the bottom when forcing to use the pure Euclidean distance 
+(because of the central cluster is still of subthreshold size, the
+'euclid' method enforces using Euclidean distance only).
+
+
+
+## Discussion on the 'subthreshHandling' methods
+
+The original 'mahal0' method is not independent on the scale of the
+clustered data (see Fig. 2E vs. 2F, 3D vs. 3E).
+
+The 'mahal' method is independent on the scale of the clustered data
+and gives quite satisfactory / intuitive results.
+
+The 'euclid' method can merge clusters close to each other in a
+non-inutitively way, ignoring their shape (see Fig. 1G) just because
+the Mahalanobis distance is not being used yet. (The reason is that
+there are still other subthreshold clusters that force using the
+Euclidean distance only. In these situations, the 'euclidMahal' method
+can help.)
+
+The 'euclidMahal' method can also yield non-inutitive results (see Fig.
+2J) - it can merge two clusters (in black) that are far from each other
+before another cluster (in red) gets formed - this is because when
+using the Mahalanobis distance, the two black clusters are effectively
+closer to each other compared to the red and green ones.
+
+
+## Conclusion
+
+One should carefully set the 'thresh' and 'subthreshHandling'
+arguments to mhclust(). Usually, the default 'mahal' method of
+'subthreshHandling' works well.
+

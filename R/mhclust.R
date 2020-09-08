@@ -79,6 +79,40 @@ normalize = FALSE, ##<< boolean. If \code{TRUE}, cluster size
 ## cluster. If \code{FALSE}, once all clusters are of at least the
 ## \code{thresh} relative size, both cluster shape and size will
 ## affect inter-cluster distance.
+subthreshHandling = c('mahal','mahal0','euclid','euclidMahal'), ##<< method
+## how subthreshold clusters distort the space around them - i.e. how
+## their size and shape gets reflected in distance computation.
+## The idea is that subthreshold clusters should not use the
+## fully-blown Mahalanobis distance, as they are too small to reliably
+## estimate the covariance matrix for them. However, resigning to pure
+## Euclidean distance for subthreshold clusters could be too harsh.
+##
+## The \code{mahal} method pushes the covariance matrices of small
+## clusters towards a sphere, such that those clusters do not distort
+## the space around them too much.
+##
+## The \code{mahal0} method is similar to \code{mahal}, but it
+## somehow ignores the scale of data contained subthreshold clusters,
+## which can lead to spurious results for clusters of data living on
+## too large / small scales. This option is mostly present only for
+## backward compatibility.
+##
+## The \code{euclidMahal} method enforces spherical (unit) covariances
+## of all subthreshold clusters (i.e. Euclidean distances are used to
+## compute distances from them), but clusters above the threshold use
+## the Mahalanobis distance, eventhough there still could exist
+## subthreshold clusters using the Euclidean distance. This disparity
+## could demonstrate in merging large super-threshold elliptical
+## clusters before subthreshold clusters form another super-threshold
+## cluster, which could be deemed non-intuitive.
+##
+## The \code{euclid} method enforces spherical covariances of all
+## clusters until there are not any subthreshold clusters. This option
+## usually leads to formation of compact superthreshold clusters, but
+## completely ignores the possible internal elliptical structure of
+## subthreshold clusters.
+##
+## See subthreshX demos to learn more.
 warn = TRUE, ##<< boolean. If \code{FALSE}, warnings about
 ## non-monotonous heights will be suppressed.
 verb = 0, ##<< level of verbosity, the greater the more detailed
@@ -95,6 +129,8 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
 ## calls over a subset of \code{x} it refers to the original full
 ## data set (internal parameter)
 ) {
+
+    subthreshHandling<-match.arg(subthreshHandling)
 
     # convert to matrix
     if (!is.matrix(x)) x<-as.matrix(x)
@@ -155,8 +191,8 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         # cluster apriori clusters first, then merge the clusterings,
         # and cluster the apriori clusters subsequently
 
-        # identity matrix - a surrogate for a correlation matrix in degenerated cases
-        fakeInvCov<-diag(ncol(x))
+        # identity matrix - a surrogate for (inverse) correlation matrix in degenerated cases
+        fakeCov<-fakeInvCov<-diag(ncol(x))
         # vector of IDs of apriori clusters, corresponding to accumulated 'gh' and 'gm'
         gg<-integer(gMergingCount)
         # 'gg' counting index
@@ -199,7 +235,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
                 iLen<-length(i)
                 iLen1<-iLen-1L
                 xx<-x[i,]
-                mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
+                mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,subthreshHandling=subthreshHandling,verb=verbRecursive,useR=useR,nFull=nFull)
             }
         } else {
             mhs<-NULL
@@ -216,7 +252,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
                     mh<-mhs[[gti]]
                 } else {
                     if (verb) cat(paste0('> recursive call (',gti,'/',length(gt),') to cluster ',iLen,' observations\n'))
-                    mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,verb=verbRecursive,useR=useR,nFull=nFull)
+                    mh<-mhclust(xx,thresh=thresh,scale=FALSE,quick=quick,g=NULL,normalize=normalize,subthreshHandling=subthreshHandling,verb=verbRecursive,useR=useR,nFull=nFull)
                     if (verb>1) cat('< returned from the recursive call\n')
                 }
             } else {
@@ -249,12 +285,36 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             } else {
                 wf1<-0
             }
+            if (iLen<=2) {
+                # this cluster is too small to estimate its covariance matrix
+                wf1<-0
+                covXx<-fakeCov
+            } else {
+                covXx<-cov(xx)
+            }
             weightFactor[gti]<-wf1
-            covXx<-cov(xx)
-            covXx<-wf1*covXx+(1-wf1)*fakeInvCov
-            c.cholDecomp<-tryCatch(chol(covXx),error=function(e)fakeInvCov)
-            invcovNmf[gti]<-(1/prod(diag(c.cholDecomp)))^(2/ncol(x))
-            invcov[[gti]]<-chol2inv(c.cholDecomp)
+            if (subthreshHandling=='mahal' || subthreshHandling=='mahal0' ||
+                (subthreshHandling=='euclid' || subthreshHandling=='euclidMahal') && wf1==1) { # the condition is verbose, but error-prone
+                # shift the covariance towards a sphere
+
+                # determine scaling factor
+                if (subthreshHandling=='mahal0') {
+                    # NOTE: this is NOT scale-independent, i.e. this affects covXij with large elements
+                    # much less than covXij with small elements!
+                    mf<-1
+                } else {
+                    # scale the unit covariance matrix by the determinant
+                    # of the empirical covariance matrix
+                    mf<-det(covXx)^(1/ncol(x))
+                }
+                covXx<-wf1*covXx+(1-wf1)*mf*fakeInvCov
+                c.cholDecomp<-tryCatch(chol(covXx),error=function(e)fakeInvCov)
+                invcov[[gti]]<-chol2inv(c.cholDecomp)
+                invcovNmf[gti]<-(1/prod(diag(c.cholDecomp)))^(2/ncol(x))
+            } else { # 'euclid' or 'euclidMahal' method with subthreshold cluster - fall back to euclidean distance
+                invcov[[gti]]<-fakeInvCov
+                invcovNmf[gti]<-1
+            }
 
             # accumulate the 'height' from the recursive call
             gh[gIdx+(1:iLen1)]<-mh$height
@@ -351,7 +411,8 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
         if (verb>1) printWithName(height)
         # initialize distance matrix
         if (verb) cat('computing distances between apriori clusters\n')
-        distX<-computeMahalDistMat(distX=NULL,nLeft,x,centroid,members,invcov,invcovNmf,normalize,quick,dbg=verb)
+        fullMahalClusterCount<-sum(clusterSize>=thresh*n)
+        distX<-computeMahalDistMat(distX=NULL,nLeft,x,centroid,members,invcov,invcovNmf,normalize||fullMahalClusterCount<nLeft,subthreshHandling,quick,dbg=verb)
         gMergingCount<-0L
     } else {
         # g not specified
@@ -362,10 +423,10 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     # implementation switch
     if (useR) {
         if (verb) cat('using R implementation\n')
-        rv<-mhclust_Rimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
+        rv<-mhclust_Rimpl(x,thresh,scale,quick,normalize,g,gMergingCount,subthreshHandling,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
     } else {
         if (verb) cat('using C implementation\n')
-        rv<-mhclust_Cimpl(x,thresh,scale,quick,normalize,g,gMergingCount,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
+        rv<-mhclust_Cimpl(x,thresh,scale,quick,normalize,g,gMergingCount,subthreshHandling,verb,nFull,nLeft,distX,centroid,members,invcov,invcovNmf,weightFactor,clusterId,clusterSize,merging,height)
     }
 
     if (verb>2) cat('rv$merge pre tx\n')
@@ -458,6 +519,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
 },ex=function() {
   opar<-par(mfrow=c(2,2))
 
+  # the desired number of clusters
   k<-3
   n<-nrow(xy)
 

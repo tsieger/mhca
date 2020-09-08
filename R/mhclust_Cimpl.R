@@ -1,13 +1,30 @@
 #' @useDynLib mhca mhclust_
-mhclust_c<-function(X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingCount,Verb,
+mhclust_c<-function(X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingCount,SubthreshHandlingId,Verb,
     .NFull,.NLeft,.Centroid,.Members,.Invcov,.DetsSqrt,.WeightFactor,.ClusterId,.ClusterSize,.membersPoolSize){
 
-    .Call(mhclust_,X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingCount,Verb,
+    .Call(mhclust_,X,DistX,Merging,Height,Threshold,Quick,Normalize,G,GMergingCount,SubthreshHandlingId,Verb,
         .NFull,.NLeft,.Centroid,.Members,.Invcov,.DetsSqrt,.WeightFactor,.ClusterId,.ClusterSize,.membersPoolSize)
 }
 
-mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
+mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,subthreshHandling,verb,
     .nFull,.nLeft,.distX,.centroid,.members,.invcov,.invcovNmf,.weightFactor,.clusterId,.clusterSize,.merging,.height) {
+
+    SUBTHRESHOLD_METHOD_MAHAL<-0
+    SUBTHRESHOLD_METHOD_MAHAL0<-1
+    SUBTHRESHOLD_METHOD_EUCLID<-2
+    SUBTHRESHOLD_METHOD_EUCLID_MAHAL<-3
+
+    if (subthreshHandling=='mahal') {
+        subthreshHandlingId<-SUBTHRESHOLD_METHOD_MAHAL
+    } else if (subthreshHandling=='mahal0') {
+        subthreshHandlingId<-SUBTHRESHOLD_METHOD_MAHAL0
+    } else if (subthreshHandling=='euclid') {
+        subthreshHandlingId<-SUBTHRESHOLD_METHOD_EUCLID
+    } else if (subthreshHandling=='euclidMahal') {
+        subthreshHandlingId<-SUBTHRESHOLD_METHOD_EUCLID_MAHAL
+    } else {
+        stop(paste0('unsupported subthreshHandling of \'',subthreshHandling,'\''))
+    }
 
     if (verb>2) {
         printWithName(.nFull)
@@ -82,7 +99,7 @@ mhclust_Cimpl<-function(x,thresh,scale,quick,normalize,g,gMergingCount,verb,
     } else {
         .membersPoolSize<-NULL
     }
-    mhclust_c(x,d,merge,height,thresh,quick,normalize,as.integer(g),as.integer(gMergingCount),as.integer(verb),
+    mhclust_c(x,d,merge,height,thresh,quick,normalize,as.integer(g),as.integer(gMergingCount),as.integer(subthreshHandlingId),as.integer(verb),
         .nFull,.nLeft,.centroid,.members,.invcov,.invcovNmf,.weightFactor,.clusterId,.clusterSize,.membersPoolSize)
 
     return(list(merge=merge,height=height))

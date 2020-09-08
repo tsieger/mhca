@@ -4,8 +4,9 @@
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
 \usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, warn = TRUE, 
-    verb = 0, verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
+    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, subthreshHandling = c("mahal", 
+        "mahal0", "euclid", "euclidMahal"), warn = TRUE, verb = 0, 
+    verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -48,6 +49,40 @@ will be ignored when computing Mahalanobis distance from the
 cluster. If \code{FALSE}, once all clusters are of at least the
 \code{thresh} relative size, both cluster shape and size will
 affect inter-cluster distance.}
+  \item{subthreshHandling}{method
+how subthreshold clusters distort the space around them - i.e. how
+their size and shape gets reflected in distance computation.
+The idea is that subthreshold clusters should not use the
+fully-blown Mahalanobis distance, as they are too small to reliably
+estimate the covariance matrix for them. However, resigning to pure
+Euclidean distance for subthreshold clusters could be too harsh.
+
+The \code{mahal} method pushes the covariance matrices of small
+clusters towards a sphere, such that those clusters do not distort
+the space around them too much.
+
+The \code{mahal0} method is similar to \code{mahal}, but it
+somehow ignores the scale of data contained subthreshold clusters,
+which can lead to spurious results for clusters of data living on
+too large / small scales. This option is mostly present only for
+backward compatibility.
+
+The \code{euclidMahal} method enforces spherical (unit) covariances
+of all subthreshold clusters (i.e. Euclidean distances are used to
+compute distances from them), but clusters above the threshold use
+the Mahalanobis distance, eventhough there still could exist
+subthreshold clusters using the Euclidean distance. This disparity
+could demonstrate in merging large super-threshold elliptical
+clusters before subthreshold clusters form another super-threshold
+cluster, which could be deemed non-intuitive.
+
+The \code{euclid} method enforces spherical covariances of all
+clusters until there are not any subthreshold clusters. This option
+usually leads to formation of compact superthreshold clusters, but
+completely ignores the possible internal elliptical structure of
+subthreshold clusters.
+
+See subthreshX demos to learn more.}
   \item{warn}{boolean. If \code{FALSE}, warnings about
 non-monotonous heights will be suppressed.}
   \item{verb}{level of verbosity, the greater the more detailed
@@ -154,6 +189,7 @@ doi:10.1002/cyto.a.21148.
 \examples{
 opar<-par(mfrow=c(2,2))
 
+# the desired number of clusters
 k<-3
 n<-nrow(xy)
 
