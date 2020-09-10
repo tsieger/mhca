@@ -25,9 +25,10 @@ mhclust<-structure(function # mhca
 ##   contained in `c').
 ##
 ##   The distance between an individual observation `x' and a cluster
-##   `c' is a mixture of the Mahalanobis and Euclidean distances from
-##   `c' to `x', weighted by the relative cluster size (see the
-##   `thresh' parameter).
+##   `c' is some mixture of the Mahalanobis and Euclidean distances from
+##   `c' to `x', depending on the relative cluster size (see the
+##   `thresh' argument) and the method of handling of clusters of
+##   subthreshold size (see the `subthreshHandling' argument).
 ##
 ##references<< Fiser K., Sieger T., Schumich A., Wood B., Irving J.,
 ## Mejstrikova E., Dworzak MN. _Detection and monitoring of normal and
@@ -46,8 +47,10 @@ thresh = 0.5, ##<< real number in the interval of (0,1) defining
 ## observations) whose distance to other clusters will be computed as a
 ## pure Mahalanobis distance. The distance from smaller clusters will
 ## be computed as a mixture of Mahalanobis and Euclidean distances,
-## with the contribution of the Mahalanobis distance being proportional
-## to the cluster size. This threshold balances the uncertainty in the
+## with the contribution of the Mahalanobis distance being larger
+## for larger clusters, in general. However, the exact handling of
+## subthreshold clusters is controlled by the \code{subthreshHandling}
+## argument (see below). This threshold balances the uncertainty in the
 ## cluster shape as estimated by the covariance matrix of its members.
 scale = FALSE, ##<< boolean. Should we transform observations by the
 ## `\code{\link{scale}}' function?
@@ -87,15 +90,19 @@ subthreshHandling = c('mahal','mahal0','euclid','euclidMahal'), ##<< method
 ## estimate the covariance matrix for them. However, resigning to pure
 ## Euclidean distance for subthreshold clusters could be too harsh.
 ##
+## The Mahalanobis distance is not used for clusters of two samples
+## only, as the covariance is degenerated in that case.
+##
 ## The \code{mahal} method pushes the covariance matrices of small
 ## clusters towards a sphere, such that those clusters do not distort
 ## the space around them too much.
 ##
 ## The \code{mahal0} method is similar to \code{mahal}, but it
-## somehow ignores the scale of data contained subthreshold clusters,
-## which can lead to spurious results for clusters of data living on
-## too large / small scales. This option is mostly present only for
-## backward compatibility.
+## somehow ignores the scale of the data contained in subthreshold
+## clusters, which can lead to spurious results for clusters of data
+## living on too large / small scales. This option is mostly present
+## only for backward compatibility, and the \code{mahall} method is
+## considered as areplacement for \code{mahall0}.
 ##
 ## The \code{euclidMahal} method enforces spherical (unit) covariances
 ## of all subthreshold clusters (i.e. Euclidean distances are used to
@@ -106,13 +113,13 @@ subthreshHandling = c('mahal','mahal0','euclid','euclidMahal'), ##<< method
 ## clusters before subthreshold clusters form another super-threshold
 ## cluster, which could be deemed non-intuitive.
 ##
-## The \code{euclid} method enforces spherical covariances of all
+## The \code{euclid} method enforces spherical (unit) covariances of all
 ## clusters until there are not any subthreshold clusters. This option
 ## usually leads to formation of compact superthreshold clusters, but
-## completely ignores the possible internal elliptical structure of
-## subthreshold clusters.
+## completely ignores the possible intrinsic structure of subthreshold
+## clusters.
 ##
-## See subthreshX demos to learn more.
+## See \code{subthreshX} demos to learn more.
 warn = TRUE, ##<< boolean. If \code{FALSE}, warnings about
 ## non-monotonous heights will be suppressed.
 verb = 0, ##<< level of verbosity, the greater the more detailed
@@ -146,6 +153,9 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
     }
     if (n==1) stop('please, supply at least 2 observations')
     if (ncol(x)==1) stop('please, supply at least 2-dimensional data')
+    if (!is.numeric(thresh) || thresh<=0 || thresh>=1) {
+        stop('invalid \'thresh\' argument:',thresh)
+    }
     if (!is.null(g)) {
         # convert factor to numeric
         if (!is.numeric(g)) stop('g must be numeric')
