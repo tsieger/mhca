@@ -1212,7 +1212,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                     normalize,fullMahalClusterCount,clusterCount);
-                if (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
+                if (fullMahalClusterCount < clusterCount-1 && subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
                     memcpy(ic1,fakeInvCov,sizeof(*fakeInvCov)*p*p);
                 } else {
                     for (i=0;i<p*p;i++) {
@@ -1354,7 +1354,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
                         DBG(4," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                             normalize,fullMahalClusterCount,clusterCount);
-                        if (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
+                        if (fullMahalClusterCount < clusterCount-1 && subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
                             memcpy(ic2,fakeInvCov,sizeof(*fakeInvCov)*p*p);
                         } else {
                             double icNmf2=invcovNmf[otherCluster];

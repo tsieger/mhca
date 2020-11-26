@@ -477,7 +477,7 @@ verb, ##<< level of verbosity, the greater the more detailed
             if (dbg>2) printWithName(ic1)
             if (normalize || fullMahalClusterCount < clusterCount-1) {
                 if (dbg>2) cat(sprintf(' normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n',normalize,fullMahalClusterCount,clusterCount))
-                if (subthreshHandling=='euclid') {
+                if (fullMahalClusterCount < clusterCount-1 && subthreshHandling=='euclid') {
                     # enforce unit covariance even if this cluster is large enough,
                     # but some of the others are not
                     ic1<-fakeInvCov
@@ -536,7 +536,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                     ic2<-invcov[[otherClusters[ii]]]
                     if (dbg>3) printWithName(ic2)
                     if (normalize || fullMahalClusterCount < clusterCount-1) {
-                        if (subthreshHandling=='euclid') {
+                        if (fullMahalClusterCount < clusterCount-1 && subthreshHandling=='euclid') {
                             # enforce unit covariance even if this cluster is large enough,
                             # but some of the others are not
                             ic2<-fakeInvCov
