@@ -1109,7 +1109,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                         mf*=covXijCholDecomp[offset];
                         offset+=p+1;
                     }
-                    mf=pow(mf,2/p);
+                    mf=pow(mf,2.0/p);
                 } else {
                     // fallback
                     mf=1.0;
