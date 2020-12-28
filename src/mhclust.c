@@ -1257,7 +1257,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 ASSERT(distXIdx>=0,"invalid distXIdx");
 
                 // if we are still clustering samples of the apriori clusters, the distance
-                // between clusters in disctinct apriori clusters arem by definition, se to Inf
+                // between clusters in disctinct apriori clusters are, by definition, se to Inf
                 //R: if (!is.null(g) && g[members[[i]][1]]!=g[members[[otherClusters[ii]]][1]] && # clusters in distinct apriori clusters
                 //R:    pointCount-(clusterCount-1) < gMergingCount) { # and we are not done with clustering the samples from prior clusters
                 //R:    distX[iRelDistXIdx[ii]]<-Inf
