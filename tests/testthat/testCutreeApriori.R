@@ -12,16 +12,16 @@ test_that("3 full apriori clusters", {
             c(-3, 1), # 1
             c(-4,-5), # 2
             c(-6,-7), # 3
-            c( 3, 4),
-            c( 2, 5)
+            c( 2, 3),
+            c( 4, 5)
         )
     )
 
     h2<-cutreeApriori(h)
     expect_equal(h2$merge,
         rbind(
-            c(-2,-3),
-            c(-1,1)
+            c(-1,-2),
+            c(-3, 1)
         )
     )
 
