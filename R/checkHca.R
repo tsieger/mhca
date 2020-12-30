@@ -43,7 +43,7 @@ dbg = 0 ##<< debug level
 
   # check 'merge'
   obs<--h$merge[h$merge<0]
-  if (dbg) .pn(sort(obs))
+  if (dbg) {cat('sort(obs):\n');print(sort(obs))}
   disp(length(obs),' observation(s) ',ifelse(length(obs)==n+1,'correspond(s)','*** DO(ES) NOT correspond ***'),' with the \'height\' of ',n,' entry(ies)',sep='')
   if (length(obs)!=n+1) ok<-FALSE
   disp(length(obs),' unique observation ID(s) ',ifelse(length(unique(obs))==n+1,'correspond(s)','*** DO(ES) NOT correspond ***'),' with the \'height\' of ',n,' entry(ies)',sep='')
@@ -55,7 +55,7 @@ dbg = 0 ##<< debug level
       if (max(obs)!=n+1) ok<-FALSE
   }
   cls<-h$merge[h$merge>0]
-  if (dbg) .pn(sort(cls))
+  if (dbg) {cat('sort(cls):\n');print(sort(cls))}
   disp(length(cls),' cluster(s) ',ifelse(length(cls)==n-1,'correspond(s)','*** DO(ES) NOT correspond ***'),' with the \'height\' of ',n,' entry(ies)',sep='')
   if (length(cls)!=n-1) ok<-FALSE
   disp(length(cls),' unique cluster ID(s) ',ifelse(length(unique(cls))==n-1,'correspond(s)','*** DO(ES) NOT correspond ***'),' with the \'height\' of ',n,' entry(ies)',sep='')
