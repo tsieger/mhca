@@ -38,7 +38,7 @@ test_that("case #2: 6 observations", {
             c(-4, 3),
             c( 2, 4)))
     expect_equal(mhclust(cbind(rep(1,6),c(1,1.1,1.3,4,4.5,4.9)))$height,
-        c(0.1,0.2496894,0.4,0.6872512,3.3333333),tolerance=1e-6)
+        c(0.1, 0.25, 0.4, 0.7, 10/3),tolerance=1e-6)
     expect_equal(mhclust(cbind(rep(1,6),c(1,1.1,1.3,4,4.5,4.9)),useR=TRUE)$height,
-        c(0.1,0.2496894,0.4,0.6872512,3.3333333),tolerance=1e-6)
+        c(0.1, 0.25, 0.4, 0.7, 10/3),tolerance=1e-6)
 })

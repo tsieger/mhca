@@ -32,3 +32,14 @@ test_that("C impl.: recusive vs. non-recursive", {
     expect_equal(suppressWarnings(mhclust(x,g=g))$height,
         suppressWarnings(mhclust(x,g=g))$height,gRecursive=FALSE)
 })
+
+test_that("apriori clusters of unequal size work", {
+  # prepare test data
+  x<-cbind(1:6,1:6)
+  g<-c(1,2,3,2,3,2)
+
+  h<-mhclust(x,g=g,warn=FALSE)
+  #print(str(h))
+  #checkHca(h,dbg=1)
+  expect_equal(checkHca(h,verb=FALSE),TRUE)
+})
