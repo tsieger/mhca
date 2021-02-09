@@ -1093,11 +1093,13 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 // NOTE: this is NOT scale-independent, i.e. this affects covXij with large elements
                 // much less than covXij with small elements!
                 mf=1.0;
+                DBG(3,"mf fixed to 1\n");
             } else {
                 // scale the unit covariance matrix by the determinant
                 // of the empirical covariance matrix
                 //R: mf<-det(covXij)^(1/spaceDim)
                 memcpy(covXijCholDecomp,covXij,sizeof(*covXij)*p*p);
+                // dpotrf computes the Cholesky factorization of a real symmetric positive definite matrix
                 F77_CALL(dpotrf)("L",// Lower diagonal is used
                                  &p,covXijCholDecomp,&p,&info);
                 DBG(4,"info: %d\n",info);
@@ -1105,13 +1107,17 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG_CODE(4,printDoubleMatrix("L",covXijCholDecomp,p,p));
                 if (info==0) {
                     mf=1.0;
+                    DBG(3,"mf init: %g\n",mf);
                     for (offset=i=0;i<p;i++) {
                         mf*=covXijCholDecomp[offset];
                         offset+=p+1;
                     }
+                    DBG(3,"mf cov: %g\n",mf);
                     mf=pow(mf,2.0/p);
+                    DBG(3,"mf pow: %g\n",mf);
                 } else {
                     // fallback
+                    DBG(3,"fallback\n");
                     mf=1.0;
                 }
             }
@@ -1216,6 +1222,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                     normalize,fullMahalClusterCount,clusterCount);
                 if (fullMahalClusterCount < clusterCount-1 && subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {
+                    DBG(3," using fakeInvCov\n");
                     memcpy(ic1,fakeInvCov,sizeof(*fakeInvCov)*p*p);
                 } else {
                     for (i=0;i<p*p;i++) {

@@ -429,6 +429,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                 # NOTE: this is NOT scale-independent, i.e. this affects covXij with large elements
                 # much less than covXij with small elements!
                 mf<-1
+                if (dbg>2) cat('mf fixed to 1')
             } else {
                 # scale the unit covariance matrix by the determinant
                 # of the empirical covariance matrix
@@ -484,6 +485,7 @@ verb, ##<< level of verbosity, the greater the more detailed
                     # enforce unit covariance even if this cluster is large enough,
                     # but some of the others are not
                     ic1<-fakeInvCov
+                    if (dbg>2) cat(' using fakeInvCov')
                 } else {
                     ic1<-ic1 / icNmf1
                 }
