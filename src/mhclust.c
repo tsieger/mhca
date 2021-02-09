@@ -1117,7 +1117,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                     DBG(3,"mf pow: %g\n",mf);
                 } else {
                     // fallback
-                    DBG(3,"fallback\n");
+                    DBG(3,"fallback: setting mf to 1\n");
                     mf=1.0;
                 }
             }
