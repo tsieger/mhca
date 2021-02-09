@@ -434,6 +434,11 @@ verb, ##<< level of verbosity, the greater the more detailed
                 # scale the unit covariance matrix by the determinant
                 # of the empirical covariance matrix
                 mf<-det(covXij)^(1/spaceDim)
+                # in case of singular covXij, det is 0 and mf also, but we want to set mf to 1
+                if (mf==0) {
+                    if (dbg>2) cat('fallback: setting mf to 1\n')
+                    mf<-1
+                }
             }
             if (dbg>2) printWithName(mf)
             # scale the covariance
