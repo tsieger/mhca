@@ -32,7 +32,7 @@ k<-3
 
 # MHCA with apriori clusters, computing the internal structure of the
 # apriori clusters
-mhgIn<-mhclust(x,thresh=.33,g=rep(c(1:3),c(nrow(x1),nrow(x2),nrow(x3))))
+mhgIn<-mhclust(x,thresh=1/3,g=rep(c(1:3),c(nrow(x1),nrow(x2),nrow(x3))))
 # note the "thresh=.33" argument: well-formed clusters are expected to be formed
 # by 33% of observations
 cmhgIn<-cutree(mhgIn,k=k)
@@ -41,7 +41,7 @@ mhgIn$height[-(1:mhgIn$n.height.apriori)]
 
 # MHCA with apriori clusters, ignoring the internal structure of the
 # apriori clusters
-mhgEx<-mhclust(x,thresh=.33,g=rep(c(1:3),c(nrow(x1),nrow(x2),nrow(x3))),gIntra=FALSE)
+mhgEx<-mhclust(x,thresh=1/3,g=rep(c(1:3),c(nrow(x1),nrow(x2),nrow(x3))),gIntra=FALSE)
 # note the "thresh=.33" argument: well-formed clusters are expected to be formed
 # by 33% of observations
 cmhgEx<-cutree(mhgEx,k=k)
