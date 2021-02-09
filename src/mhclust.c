@@ -1209,7 +1209,10 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             //R: icNmf1<-icNmf
             memcpy(ic1,invcovMerged,sizeof(*invcovMerged)*p*p);
             DBG_CODE(3,printDoubleMatrix("ic1",ic1,p,p));
-            if (normalize || fullMahalClusterCount < clusterCount-1) {
+            if (normalize || fullMahalClusterCount < clusterCount-1) { // note: there is no need to check whether
+                // # we've clustered all the samples in the apriori clusters, as apriori clusters should be small and
+                // the "fullMahalClusterCount < clusterCount-1" condition should thus be trivially satisfied when
+                // still clustering apriori clusters
                 DBG(3," normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n",
                     normalize,fullMahalClusterCount,clusterCount);
                 if (fullMahalClusterCount < clusterCount-1 && subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID) {

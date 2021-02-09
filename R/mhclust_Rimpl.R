@@ -475,7 +475,10 @@ verb, ##<< level of verbosity, the greater the more detailed
             ic1<-invcov_merged
             icNmf1<-icNmf
             if (dbg>2) printWithName(ic1)
-            if (normalize || fullMahalClusterCount < clusterCount-1) {
+            if (normalize || fullMahalClusterCount < clusterCount-1) { # note: there is no need to check whether
+                # we've clustered all the samples in the apriori clusters, as apriori clusters should be small and
+                # the "fullMahalClusterCount < clusterCount-1" condition should thus be trivially satisfied when
+                # still clustering apriori clusters
                 if (dbg>2) cat(sprintf(' normalizing (normalize %d, clusters with full Mahalanobis = %d, clusters =  %d)\n',normalize,fullMahalClusterCount,clusterCount))
                 if (fullMahalClusterCount < clusterCount-1 && subthreshHandling=='euclid') {
                     # enforce unit covariance even if this cluster is large enough,

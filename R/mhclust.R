@@ -60,7 +60,17 @@ quick = FALSE, ##<< boolean. If \code{TRUE}, inter-cluster
 g = NULL, ##<< Optional assignment of samples to apriori clusters. By
 ## default, there are no apriori clusters, and clustering starts from
 ## individual observations. If \code{g} is supplied, the clustering
-## process depends on the value of the \code{gIntra} argument.
+## starts from apriori clusters (and the structure within the apriori
+## clusters depends on the value of the \code{gIntra} argument).
+## Intuitively, apriori clusters group observations that are known
+## (from principle) to form compact clusters, whose internal structure
+## is not of interest from the perspective of the whole hierarchical
+## clustering. Apriori clusters are typically small: they are much
+## smaller compared to the clusters whose relative distances
+## are to be computed using pure Mahalanobis distance. That said, it
+## makes not much sense to define an apriori cluster of size close to
+## the number of observations multiplied by \code{thresh} (we raise a
+## warning in that case).
 ## \code{g} is expected to be a numeric vector of length corresponding
 ## to the number of rows of \code{x}, holding the index of apriori
 ## cluster each sample is member of. \code{0}'s can appear in the
@@ -68,7 +78,8 @@ g = NULL, ##<< Optional assignment of samples to apriori clusters. By
 ## apriori cluster. Run \code{demo(apriori)} for an example.
 gIntra = TRUE, ##<< boolean. If \code{TRUE}, the intrinsic structure of
 ## the apriori clusters (defined using the \code{g} argument) gets
-## computed before the apriori clusters get clustered. If \code{FALSE},
+## computed before the apriori clusters get merged with their neighbours.
+## If \code{FALSE},
 ## the intrinsic structure of the apriori clusters is not of interest
 ## (the corresponding elements of the result are not defined and should
 ## be ignored) and clustering starts directly from the level of the
@@ -170,6 +181,10 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
             gt[1]==n || # a single apriori cluster of all observations
             all(gt==1)) { # each observation forms its own apriori cluster
             g<-NULL
+        }
+        if (max(gt)>thresh*n) {
+            nm<-names(gt)[which.max(gt)[1]]
+            warning(paste0('apriori cluster ',nm,' is too large, consider increasing the \'thresh\' parameter?'))
         }
     }
     if (!is.null(g)) {
