@@ -1040,7 +1040,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             offset1+=xijN;
             offset2+=n;
         }
-        DBG_CODE(2,printDoubleMatrix("xij",xij,xijN,p));
+        DBG_CODE(3,printDoubleMatrix("xij",xij,xijN,p));
 
         // compute the weight factor controlling the Mahalanobis-Euclidean
         // balance (to be applied when measuring distances relatively to
