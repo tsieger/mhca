@@ -3,10 +3,17 @@
 \title{mhca}
 \description{Hierarchical clustering with Mahalanobis inter-cluster distances.
 }
-\usage{mhclust(x, thresh = 0.5, scale = FALSE, quick = FALSE, g = NULL, 
-    gIntra = TRUE, gParallel = TRUE, normalize = FALSE, subthreshHandling = c("mahal", 
-        "mahal0", "euclid", "euclidMahal"), warn = TRUE, verb = 0, 
-    verbRecursive = verb, useR = FALSE, nFull = nrow(as.matrix(x)))}
+\usage{mhclust(x, thresh = 0.5, 
+    scale = FALSE, quick = FALSE, 
+    g = NULL, gIntra = TRUE, 
+    gParallel = TRUE, 
+    normalize = FALSE, 
+    subthreshHandling = c("mahal", 
+        "mahal0", "euclid", 
+        "euclidMahal"), 
+    warn = TRUE, verb = 0, 
+    verbRecursive = verb, 
+    useR = FALSE, nFull = nrow(as.matrix(x)))}
 \arguments{
   \item{x}{data.frame or matrix containing coordinates of elementary
 observations. Rows correspond to observations, columns correspond
@@ -16,8 +23,10 @@ the minimal relative size of cluster (relative to the number of
 observations) whose distance to other clusters will be computed as a
 pure Mahalanobis distance. The distance from smaller clusters will
 be computed as a mixture of Mahalanobis and Euclidean distances,
-with the contribution of the Mahalanobis distance being proportional
-to the cluster size. This threshold balances the uncertainty in the
+with the contribution of the Mahalanobis distance being larger
+for larger clusters, in general. However, the exact handling of
+subthreshold clusters is controlled by the \code{subthreshHandling}
+argument (see below). This threshold balances the uncertainty in the
 cluster shape as estimated by the covariance matrix of its members.}
   \item{scale}{boolean. Should we transform observations by the
 `\code{\link{scale}}' function?}
@@ -27,7 +36,17 @@ all observations contained in the clusters will be used.}
   \item{g}{Optional assignment of samples to apriori clusters. By
 default, there are no apriori clusters, and clustering starts from
 individual observations. If \code{g} is supplied, the clustering
-process depends on the value of the \code{gIntra} argument.
+starts from apriori clusters (and the structure within the apriori
+clusters depends on the value of the \code{gIntra} argument).
+Intuitively, apriori clusters group observations that are known
+(from principle) to form compact clusters, whose internal structure
+is not of interest from the perspective of the whole hierarchical
+clustering. Apriori clusters are typically small: they are much
+smaller compared to the clusters whose relative distances
+are to be computed using pure Mahalanobis distance. That said, it
+makes not much sense to define an apriori cluster of size close to
+the number of observations multiplied by \code{thresh} (we raise a
+warning in that case).
 \code{g} is expected to be a numeric vector of length corresponding
 to the number of rows of \code{x}, holding the index of apriori
 cluster each sample is member of. \code{0}'s can appear in the
@@ -35,7 +54,8 @@ vector meaning that the corresponding sample is not member of any
 apriori cluster. Run \code{demo(apriori)} for an example.}
   \item{gIntra}{boolean. If \code{TRUE}, the intrinsic structure of
 the apriori clusters (defined using the \code{g} argument) gets
-computed before the apriori clusters get clustered. If \code{FALSE},
+computed before the apriori clusters get merged with their neighbours.
+If \code{FALSE},
 the intrinsic structure of the apriori clusters is not of interest
 (the corresponding elements of the result are not defined and should
 be ignored) and clustering starts directly from the level of the
@@ -57,15 +77,19 @@ fully-blown Mahalanobis distance, as they are too small to reliably
 estimate the covariance matrix for them. However, resigning to pure
 Euclidean distance for subthreshold clusters could be too harsh.
 
+The Mahalanobis distance is not used for clusters of two samples
+only, as the covariance is degenerated in that case.
+
 The \code{mahal} method pushes the covariance matrices of small
 clusters towards a sphere, such that those clusters do not distort
 the space around them too much.
 
 The \code{mahal0} method is similar to \code{mahal}, but it
-somehow ignores the scale of data contained subthreshold clusters,
-which can lead to spurious results for clusters of data living on
-too large / small scales. This option is mostly present only for
-backward compatibility.
+somehow ignores the \code{scale} of the data contained in subthreshold
+clusters, which can lead to spurious results for clusters of data
+living on too large / small scales. This option is mostly present
+only for backward compatibility, and the \code{mahall} method is
+considered as areplacement for \code{mahall0}.
 
 The \code{euclidMahal} method enforces spherical (unit) covariances
 of all subthreshold clusters (i.e. Euclidean distances are used to
@@ -76,13 +100,13 @@ could demonstrate in merging large super-threshold elliptical
 clusters before subthreshold clusters form another super-threshold
 cluster, which could be deemed non-intuitive.
 
-The \code{euclid} method enforces spherical covariances of all
+The \code{euclid} method enforces spherical (unit) covariances of all
 clusters until there are not any subthreshold clusters. This option
 usually leads to formation of compact superthreshold clusters, but
-completely ignores the possible internal elliptical structure of
-subthreshold clusters.
+completely ignores the possible intrinsic structure of subthreshold
+clusters.
 
-See subthreshX demos to learn more.}
+See \code{subthreshX} demos to learn more.}
   \item{warn}{boolean. If \code{FALSE}, warnings about
 non-monotonous heights will be suppressed.}
   \item{verb}{level of verbosity, the greater the more detailed
@@ -115,16 +139,17 @@ mean ( dist ( c2_i, c1 ) )
 where `c1',`c2' denote clusters, `c1_i' iterates over members of `c1',
 `c2_i' iterates over members of `c2', and
 
-\eqn{dist(x,c) = sqrt ( ( x - \hat{c} )' * cov(c)^-1 * ( x - \hat{c} ) )}
+\eqn{dist(x,c) = sqrt ( ( \code{x} - \hat{c} )' * cov(c)^-1 * ( \code{x} - \hat{c} ) )}
 
 where `c' is a cluster, `x' is an observation column vector,
 \eqn{\hat{c}} is the center of cluster `c' (mean of the observations
 contained in `c').
 
 The distance between an individual observation `x' and a cluster
-`c' is a mixture of the Mahalanobis and Euclidean distances from
-`c' to `x', weighted by the relative cluster size (see the
-`thresh' parameter).
+`c' is some mixture of the Mahalanobis and Euclidean distances from
+`c' to `x', depending on the relative cluster size (see the
+`thresh' argument) and the method of handling of clusters of
+subthreshold size (see the `subthreshHandling' argument).
 }
 \value{An object of class *hclust*. The object is a list with
 components:
@@ -189,6 +214,7 @@ doi:10.1002/cyto.a.21148.
 \examples{
 opar<-par(mfrow=c(2,2))
 
+data(xy)
 # the desired number of clusters
 k<-3
 n<-nrow(xy)

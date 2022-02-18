@@ -544,6 +544,7 @@ nFull = nrow(as.matrix(x)) ##<< number of observations; this equals
 },ex=function() {
   opar<-par(mfrow=c(2,2))
 
+  data(xy)
   # the desired number of clusters
   k<-3
   n<-nrow(xy)
