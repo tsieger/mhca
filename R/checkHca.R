@@ -29,7 +29,7 @@ dbg = 0 ##<< debug level
   disp('\'method\' component',ifelse(!is.null(h$method),'present','*** MISSING '))
   if (is.null(h$method)) ok<-FALSE
   disp('\'dist.method\' component',ifelse(!is.null(h$dist.method),'present','*** MISSING ***'))
-  if (is.null(h$dist.method)) ok<-FALSE
+  #if (is.null(h$dist.method)) ok<-FALSE
 
   # number of clusters
   n<-length(h$height)
