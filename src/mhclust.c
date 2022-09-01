@@ -1083,7 +1083,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
         // not be took too serious: the covariance could be made closer
         // to circle, or even replaced by spherical covariance
         if (subthreshHandlingId==SUBTHRESHOLD_METHOD_MAHAL || subthreshHandlingId==SUBTHRESHOLD_METHOD_MAHAL0 ||
-            (subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID || subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID_MAHAL) && wf1==1) {
+            ((subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID || subthreshHandlingId==SUBTHRESHOLD_METHOD_EUCLID_MAHAL) && wf1==1)) {
             // the condition is verbose, but error-prone
 
             // shift the covariance towards a sphere
