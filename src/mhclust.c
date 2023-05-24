@@ -6,11 +6,22 @@
  * preserved and prefixed with `//R:'.
  */
 
+// Taken from https://cran.r-project.org/doc/manuals/r-devel/R-exts.html#Fortran-character-strings:
+//
+// before any R headers, or define in PKG_CPPFLAGS
+#ifndef  USE_FC_LEN_T
+# define USE_FC_LEN_T
+#endif
+#include <Rconfig.h>
+#include <R_ext/BLAS.h>
+#ifndef FCONE
+# define FCONE
+#endif
+
 #include <R.h>
 #include <Rdefines.h>
 #include <Rinternals.h>
 #include <Rmath.h>
-#include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
 
 // enable debugs and progress info
@@ -345,7 +356,7 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,i
                     IC,&p, // IC, ld = p
                     X,&n, // X, ld = n
                     &beta,
-                    buf,&n); // R, ld = n
+                    buf,&n FCONE FCONE); // R, ld = n
     DBG_CODE(4,printDoubleMatrix("result",buf,n,p));
 
     // mean Mahalanobis distance from origin to rows of X
@@ -363,7 +374,7 @@ double computeMahalanobisDistance(double *X,Num n,Num p,double *IC,double *buf,i
         buf[i]=sqrt(sum);
     }
     i=1; // lda of result
-    r=F77_NAME(dasum)(&n,buf,&i)/n;
+    r=F77_CALL(dasum)(&n,buf,&i)/n;
     return r;
 }
 
@@ -1101,7 +1112,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
                 memcpy(covXijCholDecomp,covXij,sizeof(*covXij)*p*p);
                 // dpotrf computes the Cholesky factorization of a real symmetric positive definite matrix
                 F77_CALL(dpotrf)("L",// Lower diagonal is used
-                                 &p,covXijCholDecomp,&p,&info);
+                                 &p,covXijCholDecomp,&p,&info FCONE);
                 DBG(4,"info: %d\n",info);
                 ASSERT(info>=0,"invalid dpotrf retcode");
                 DBG_CODE(4,printDoubleMatrix("L",covXijCholDecomp,p,p));
@@ -1133,7 +1144,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
             // if it fails, fall back to the unit matrix
             //R: c.cholDecomp<-tryCatch(chol(covXij),error=function(e) fakeInvCov)
             F77_CALL(dpotrf)("L",// Lower diagonal is used
-                             &p,covXij,&p,&info);
+                             &p,covXij,&p,&info FCONE);
             DBG(4,"info: %d\n",info);
             ASSERT(info>=0,"invalid dpotrf retcode");
             DBG_CODE(4,printDoubleMatrix("L",covXij,p,p));
@@ -1149,7 +1160,7 @@ SEXP mhclust_(SEXP X,SEXP DistX,SEXP Merging,SEXP Height,SEXP Thresh,SEXP Quick,
 
                 //R: invcov_merged<-chol2inv(c.cholDecomp)
                 F77_CALL(dpotri)("L",// Lower diagonal is used
-                                 &p,covXij,&p,&info);
+                                 &p,covXij,&p,&info FCONE);
                 DBG(4,"info: %d\n",info);
                 DBG_CODE(4,printDoubleMatrix("I",covXij,p,p));
                 memcpy(invcovMerged,covXij,sizeof(*covXij)*p*p);
